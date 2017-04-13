@@ -6,3 +6,9 @@
 proposal/proposal.pdf
 *.bbl
 *.blg
+*.cmake
+CMakeCache.txt
+Makefile
+CMakeFiles/
+tests/*
+main
