@@ -46,14 +46,6 @@
 
 #define TIME 1
 
-inline void printTime(double* startTime, const char* prompt) {
-    double endTime = CycleTimer::currentSeconds();
-
-    printf("%s:    %.4f ms\n", prompt, 1000.f * (endTime - *startTime));
-
-    *startTime = endTime;
-}
-
 /*---------------------------
 |  TrackerKCFModel
 |---------------------------*/
@@ -167,6 +159,42 @@ namespace cv {
     bool resizeImage; // resize the image whenever needed and the patch size is large
 
     int frame;
+
+    #if TIME
+    static const int num_steps = 5;
+    double cumulated_times[num_steps];
+    std::string steps_labels[num_steps - 1] =
+        {"--> Detection",
+         "--> Extracting patches",
+         "--> Feature compression",
+         "--> Least Squares Regression"};
+
+    void printTime(double time, std::string prompt) {
+        printf("%s:    %.4f ms\n", prompt.c_str(), 1000. * time);
+    }
+    void printInitializationTime(double startTime) {
+        double endTime = CycleTimer::currentSeconds();
+        printTime(endTime - startTime, "Initialization");
+    }
+    void updateTime(double startTime, int time_type) {
+        double endTime = CycleTimer::currentSeconds();
+        cumulated_times[time_type] += endTime - startTime;
+    }
+    void printTimes() {
+        if (frame != 1) {
+            // Clear previous times
+            for (int i = 0; i < num_steps; i++) {
+                printf("\e[A");
+            }
+        }
+        char buffer[50];
+        sprintf(buffer, "Average time for the first %d frames", frame);
+        printTime(cumulated_times[0] / frame, buffer);
+        for (int i = 0; i < num_steps-1; i++) {
+            printTime(cumulated_times[i+1] / frame, steps_labels[i]);
+        }
+    }
+    #endif
   };
 
   /*
@@ -182,7 +210,11 @@ namespace cv {
     resizeImage = false;
     use_custom_extractor_pca = false;
     use_custom_extractor_npca = false;
-
+    #if TIME
+    for (int i = 0; i < 5; i++) {
+        cumulated_times[i] = 0;
+    }
+    #endif
   }
 
   void TackerKCFImplSequential::read( const cv::FileNode& fn ){
@@ -270,10 +302,11 @@ namespace cv {
       || use_custom_extractor_npca
     );
 
-    // TODO: return true only if roi inside the image
-    #ifdef TIME
-      printTime(&startInit,"Initialization");
+    #if TIME
+    printInitializationTime(startInit);
     #endif
+
+    // TODO: return true only if roi inside the image
     return true;
   }
 
@@ -356,8 +389,8 @@ namespace cv {
       roi.x+=(maxLoc.x-roi.width/2+1);
       roi.y+=(maxLoc.y-roi.height/2+1);
     }
-    #ifdef TIME
-      printTime(&startDetection,"---> Detection");
+    #if TIME
+    updateTime(startDetection, 1);
     #endif
 
     double startPatches = CycleTimer::currentSeconds();
@@ -398,8 +431,8 @@ namespace cv {
       Z[1]=(1.0-params.interp_factor)*Z[1]+params.interp_factor*X[1];
     }
 
-    #ifdef TIME
-      printTime(&startPatches,"---> Extracting patches");
+    #if TIME
+    updateTime(startPatches, 2);
     #endif
 
     double startCompression = CycleTimer::currentSeconds();
@@ -424,8 +457,8 @@ namespace cv {
     else
       merge(X,2,x);
 
-    #ifdef TIME
-        printTime(&startCompression,"---> Feature compression");
+    #if TIME
+    updateTime(startCompression, 3);
     #endif
 
     double startLeastSquares = CycleTimer::currentSeconds();
@@ -473,12 +506,12 @@ namespace cv {
     }
 
     frame++;
-    #ifdef TIME
-        printTime(&startLeastSquares,"---> Least Squares Regression");
+    #if TIME
+    updateTime(startLeastSquares, 4);
+    updateTime(startUpdate, 0);
+    printTimes();
     #endif
-    #ifdef TIME
-      printTime(&startUpdate,"Total for this frame");
-    #endif
+
     return true;
   }
 
