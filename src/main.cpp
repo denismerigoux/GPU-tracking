@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     video.read(frame);
 
     // Define an initial bounding box
-    Rect2d bbox(287, 23, 86, 320);
+    Rect2d bbox(587, 223, 286, 720);
 
     // Uncomment the line below if you
     // want to choose the bounding box
