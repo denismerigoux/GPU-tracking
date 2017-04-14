@@ -46,6 +46,10 @@
 
 #define TIME 2
 
+#if TIME
+#include <iomanip>
+#endif
+
 /*---------------------------
 |  TrackerKCFModel
 |---------------------------*/
@@ -189,8 +193,15 @@ namespace cv {
     double cumulated_details_times[num_steps-1][max_num_details];
     #endif
 
-    void printTime(double time, const char *prefix, const char *prompt) {
-        printf("%s%s:    %.4f ms\n", prefix, prompt, 1000. * time);
+    void printTime(double time, const std::string prefix, const  std::string label) {
+        static const int labelWidth = 50;
+        static const int precision = 3;
+        // Print the label
+        std::cout << prefix << std::left << std::setw(labelWidth) << label
+             << std::setfill(' ')
+        // Print the time
+             << std::fixed << std::setprecision(precision) << (1000. * time)
+             << "ms" << std::endl;
     }
     void printInitializationTime(double startTime) {
         double endTime = CycleTimer::currentSeconds();
@@ -212,16 +223,16 @@ namespace cv {
                 printf("\e[A");
             }
         }
-        char buffer[50];
+        char buffer[45];
         sprintf(buffer, "Average time for the first %d frames", frame);
         printTime(cumulated_times[num_steps-1] / frame, "", buffer);
         for (int i = 0; i < num_steps-1; i++) {
             printTime(cumulated_times[i] / frame, "--> ",
-                steps_labels[i].c_str());
+                steps_labels[i]);
             #if TIME == 2
             for (int j = 0; j < num_steps_details[i]; j++) {
-                printTime(cumulated_details_times[i][j] / frame, "----> ",
-                    steps_details_labels[i][j].c_str());
+                printTime(cumulated_details_times[i][j] / frame, "-----> ",
+                    steps_details_labels[i][j]);
             }
             #endif
         }
