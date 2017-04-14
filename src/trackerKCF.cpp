@@ -44,7 +44,7 @@
 #include <complex>
 #include "cycleTimer.h"
 
-#define TIME 1
+#define TIME 2
 
 /*---------------------------
 |  TrackerKCFModel
@@ -162,42 +162,74 @@ namespace cv {
 
     #if TIME
     static const int num_steps = 5;
-    double cumulated_times[num_steps];
-    std::string steps_labels[num_steps - 1] =
-        {"--> Detection",
-         "--> Extracting patches",
-         "--> Feature compression",
-         "--> Least Squares Regression"};
+    int total_lines;
+    const std::string steps_labels[num_steps - 1] =
+        {"Detection",
+         "Extracting patches",
+         "Feature compression",
+         "Least Squares Regression"};
 
-    void printTime(double time, std::string prompt) {
-        printf("%s:    %.4f ms\n", prompt.c_str(), 1000. * time);
+    double cumulated_times[num_steps];
+
+    #if TIME == 2
+    static const int max_num_details = 11;
+    const int num_steps_details[num_steps - 1] = {11, 0, 0, 0};
+    const std::string steps_details_labels[num_steps - 1][max_num_details] =
+        {{"Extract and pre-process the patch",
+          "Non-compressed custom descriptors",
+          "Compressed descriptors",
+          "Compressed custom descritors",
+          "Compress features and KRSL",
+          "Copy KRLS",
+          "Merge all features",
+          "Compute the gaussian kernel",
+          "Compute the FFT",
+          "Calculate filter response",
+          "Extract maximum response"}};
+    double cumulated_details_times[num_steps-1][max_num_details];
+    #endif
+
+    void printTime(double time, const char *prefix, const char *prompt) {
+        printf("%s%s:    %.4f ms\n", prefix, prompt, 1000. * time);
     }
     void printInitializationTime(double startTime) {
         double endTime = CycleTimer::currentSeconds();
-        printTime(endTime - startTime, "Initialization");
+        printTime(endTime - startTime, "", "Initialization");
     }
-    void updateTime(double startTime, int time_type) {
+    void updateTime(double startTime, int step) {
         double endTime = CycleTimer::currentSeconds();
-        cumulated_times[time_type] += endTime - startTime;
+        cumulated_times[step] += endTime - startTime;
+    }
+    void updateTimeDetail(double *startTime, int step, int step_detail) {
+        double endTime = CycleTimer::currentSeconds();
+        cumulated_details_times[step][step_detail] += endTime - *startTime;
+        *startTime = endTime;
     }
     void printTimes() {
         if (frame != 1) {
             // Clear previous times
-            for (int i = 0; i < num_steps; i++) {
+            for (int i = 0; i < total_lines; i++) {
                 printf("\e[A");
             }
         }
         char buffer[50];
         sprintf(buffer, "Average time for the first %d frames", frame);
-        printTime(cumulated_times[0] / frame, buffer);
+        printTime(cumulated_times[num_steps-1] / frame, "", buffer);
         for (int i = 0; i < num_steps-1; i++) {
-            printTime(cumulated_times[i+1] / frame, steps_labels[i]);
+            printTime(cumulated_times[i] / frame, "--> ",
+                steps_labels[i].c_str());
+            #if TIME == 2
+            for (int j = 0; j < num_steps_details[i]; j++) {
+                printTime(cumulated_details_times[i][j] / frame, "----> ",
+                    steps_details_labels[i][j].c_str());
+            }
+            #endif
         }
     }
     #endif
   };
 
-  /*
+ /*
  * Constructor
  */
   Ptr<TrackerKCF> TrackerKCF::createTracker(const TrackerKCF::Params &parameters){
@@ -211,9 +243,18 @@ namespace cv {
     use_custom_extractor_pca = false;
     use_custom_extractor_npca = false;
     #if TIME
-    for (int i = 0; i < 5; i++) {
+    total_lines = num_steps;
+    for (int i = 0; i < num_steps; i++) {
         cumulated_times[i] = 0;
     }
+    #endif
+    #if TIME == 2
+    for (int i = 0; i < num_steps - 1; i++) {
+        total_lines += num_steps_details[i];
+        for (int j = 0; j < max_num_details; j++) {
+            cumulated_details_times[i][j] = 0;
+        }
+}
     #endif
   }
 
@@ -233,7 +274,9 @@ namespace cv {
    * - perform FFT to the gaussian response
    */
   bool TackerKCFImplSequential::initImpl( const Mat& /*image*/, const Rect2d& boundingBox ){
+    #if TIME
     double startInit = CycleTimer::currentSeconds();
+    #endif
 
     frame=0;
     roi = boundingBox;
@@ -314,7 +357,10 @@ namespace cv {
    * Main part of the KCF algorithm
    */
   bool TackerKCFImplSequential::updateImpl( const Mat& image, Rect2d& boundingBox ){
+    #if TIME
     double startUpdate = CycleTimer::currentSeconds();
+    #endif
+
     double minVal, maxVal;	// min-max response
     Point minLoc,maxLoc;	// min-max location
 
@@ -325,30 +371,55 @@ namespace cv {
     // resize the image whenever needed
     if(resizeImage)resize(img,img,Size(img.cols/2,img.rows/2));
 
+    #if TIME
     double startDetection = CycleTimer::currentSeconds();
+    #endif
+
     // detection part
     if(frame>0){
+      #if TIME == 2
+      double startDetectionDetail = CycleTimer::currentSeconds();
+      #endif
 
       // extract and pre-process the patch
       // get non compressed descriptors
       for(unsigned i=0;i<descriptors_npca.size()-extractor_npca.size();i++){
         if(!getSubWindow(img,roi, features_npca[i], img_Patch, descriptors_npca[i]))return false;
       }
+
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 0);
+      #endif
+
       //get non-compressed custom descriptors
       for(unsigned i=0,j=(unsigned)(descriptors_npca.size()-extractor_npca.size());i<extractor_npca.size();i++,j++){
         if(!getSubWindow(img,roi, features_npca[j], extractor_npca[i]))return false;
       }
       if(features_npca.size()>0)merge(features_npca,X[1]);
 
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 1);
+      #endif
+
       // get compressed descriptors
       for(unsigned i=0;i<descriptors_pca.size()-extractor_pca.size();i++){
         if(!getSubWindow(img,roi, features_pca[i], img_Patch, descriptors_pca[i]))return false;
       }
+
+
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 2);
+      #endif
+
       //get compressed custom descriptors
       for(unsigned i=0,j=(unsigned)(descriptors_pca.size()-extractor_pca.size());i<extractor_pca.size();i++,j++){
         if(!getSubWindow(img,roi, features_pca[j], extractor_pca[i]))return false;
       }
       if(features_pca.size()>0)merge(features_pca,X[0]);
+
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 3);
+      #endif
 
       //compress the features and the KRSL model
       if(params.desc_pca !=0){
@@ -356,8 +427,16 @@ namespace cv {
         compress(proj_mtx,Z[0],Zc[0],data_temp,compress_data);
       }
 
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 4);
+      #endif
+
       // copy the compressed KRLS model
       Zc[1] = Z[1];
+
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 5);
+      #endif
 
       // merge all features
       if(features_npca.size()==0){
@@ -371,12 +450,24 @@ namespace cv {
         merge(Zc,2,z);
       }
 
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 6);
+      #endif
+
       //compute the gaussian kernel
       denseGaussKernel(params.sigma,x,z,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
+
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 7);
+      #endif
 
       // compute the fourier transform of the kernel
       fft2(k,kf);
       if(frame==1)spec2=Mat_<Vec2d >(kf.rows, kf.cols);
+
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 8);
+      #endif
 
       // calculate filter response
       if(params.split_coeff)
@@ -384,16 +475,24 @@ namespace cv {
       else
         calcResponse(alphaf,kf,response, spec);
 
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 9);
+      #endif
+
       // extract the maximum response
       minMaxLoc( response, &minVal, &maxVal, &minLoc, &maxLoc );
       roi.x+=(maxLoc.x-roi.width/2+1);
       roi.y+=(maxLoc.y-roi.height/2+1);
-    }
-    #if TIME
-    updateTime(startDetection, 1);
-    #endif
 
+      #if TIME == 2
+      updateTimeDetail(&startDetectionDetail, 0, 10);
+      #endif
+    }
+
+    #if TIME
+    updateTime(startDetection, 0);
     double startPatches = CycleTimer::currentSeconds();
+    #endif
 
     // update the bounding box
     boundingBox.x=(resizeImage?roi.x*2:roi.x)+(resizeImage?roi.width*2:roi.width)/4;
@@ -432,10 +531,10 @@ namespace cv {
     }
 
     #if TIME
-    updateTime(startPatches, 2);
+    updateTime(startPatches, 1);
+    double startCompression = CycleTimer::currentSeconds();
     #endif
 
-    double startCompression = CycleTimer::currentSeconds();
 
     if(params.desc_pca !=0 || use_custom_extractor_pca){
       // initialize the vector of Mat variables
@@ -458,10 +557,10 @@ namespace cv {
       merge(X,2,x);
 
     #if TIME
-    updateTime(startCompression, 3);
+    updateTime(startCompression, 2);
+    double startLeastSquares = CycleTimer::currentSeconds();
     #endif
 
-    double startLeastSquares = CycleTimer::currentSeconds();
 
     // initialize some required Mat variables
     if(frame==0){
@@ -507,8 +606,8 @@ namespace cv {
 
     frame++;
     #if TIME
-    updateTime(startLeastSquares, 4);
-    updateTime(startUpdate, 0);
+    updateTime(startLeastSquares, 3);
+    updateTime(startUpdate, 4);
     printTimes();
     #endif
 
