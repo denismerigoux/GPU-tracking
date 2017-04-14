@@ -219,8 +219,9 @@ namespace cv {
     // TIME == 2: Detailed view
     #if TIME == 2
     static const int max_num_details = 11;
-    const int num_steps_details[num_steps - 1] = {11, 0, 0, 0};
+    const int num_steps_details[num_steps - 1] = {11, 6, 0, 0};
     const std::string steps_details_labels[num_steps - 1][max_num_details] =
+        // Detection
         {{"Extract and pre-process the patch",
           "Non-compressed custom descriptors",
           "Compressed descriptors",
@@ -231,7 +232,14 @@ namespace cv {
           "Compute the gaussian kernel",
           "Compute the FFT",
           "Calculate filter response",
-          "Extract maximum response"}};
+          "Extract maximum response"},
+         // Extraction patches
+         {"Update bounding box",
+          "Non-compressed descriptors",
+          "Non-compressed custom descriptors",
+          "Compressed descriptors",
+          "Compressed custom descriptors",
+          "Update training data"}};
     double cumulated_details_times[num_steps-1][max_num_details];
 
     void updateTimeDetail(double *startTime, int step, int step_detail) {
@@ -505,7 +513,12 @@ namespace cv {
 
     #if TIME
     updateTime(startDetection, 0);
+
     double startPatches = CycleTimer::currentSeconds();
+    #endif
+
+    #if TIME == 2
+    double startPatchesDetail = CycleTimer::currentSeconds();
     #endif
 
     // update the bounding box
@@ -514,26 +527,49 @@ namespace cv {
     boundingBox.width = (resizeImage?roi.width*2:roi.width)/2;
     boundingBox.height = (resizeImage?roi.height*2:roi.height)/2;
 
+    #if TIME == 2
+    updateTimeDetail(&startPatchesDetail, 1, 0);
+    #endif
+
     // extract the patch for learning purpose
     // get non compressed descriptors
     for(unsigned i=0;i<descriptors_npca.size()-extractor_npca.size();i++){
       if(!getSubWindow(img,roi, features_npca[i], img_Patch, descriptors_npca[i]))return false;
     }
+
+    #if TIME == 2
+    updateTimeDetail(&startPatchesDetail, 1, 1);
+    #endif
+
+
     //get non-compressed custom descriptors
     for(unsigned i=0,j=(unsigned)(descriptors_npca.size()-extractor_npca.size());i<extractor_npca.size();i++,j++){
       if(!getSubWindow(img,roi, features_npca[j], extractor_npca[i]))return false;
     }
     if(features_npca.size()>0)merge(features_npca,X[1]);
 
+    #if TIME == 2
+    updateTimeDetail(&startPatchesDetail, 1, 2);
+    #endif
+
     // get compressed descriptors
     for(unsigned i=0;i<descriptors_pca.size()-extractor_pca.size();i++){
       if(!getSubWindow(img,roi, features_pca[i], img_Patch, descriptors_pca[i]))return false;
     }
+
+    #if TIME == 2
+    updateTimeDetail(&startPatchesDetail, 1, 3);
+    #endif
+
     //get compressed custom descriptors
     for(unsigned i=0,j=(unsigned)(descriptors_pca.size()-extractor_pca.size());i<extractor_pca.size();i++,j++){
       if(!getSubWindow(img,roi, features_pca[j], extractor_pca[i]))return false;
     }
     if(features_pca.size()>0)merge(features_pca,X[0]);
+
+    #if TIME == 2
+    updateTimeDetail(&startPatchesDetail, 1, 4);
+    #endif
 
     //update the training data
     if(frame==0){
@@ -543,6 +579,10 @@ namespace cv {
       Z[0]=(1.0-params.interp_factor)*Z[0]+params.interp_factor*X[0];
       Z[1]=(1.0-params.interp_factor)*Z[1]+params.interp_factor*X[1];
     }
+
+    #if TIME == 2
+    updateTimeDetail(&startPatchesDetail, 1, 5);
+    #endif
 
     #if TIME
     updateTime(startPatches, 1);
