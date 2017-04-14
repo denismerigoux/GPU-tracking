@@ -175,24 +175,6 @@ namespace cv {
 
     double cumulated_times[num_steps];
 
-    #if TIME == 2
-    static const int max_num_details = 11;
-    const int num_steps_details[num_steps - 1] = {11, 0, 0, 0};
-    const std::string steps_details_labels[num_steps - 1][max_num_details] =
-        {{"Extract and pre-process the patch",
-          "Non-compressed custom descriptors",
-          "Compressed descriptors",
-          "Compressed custom descritors",
-          "Compress features and KRSL",
-          "Copy KRLS",
-          "Merge all features",
-          "Compute the gaussian kernel",
-          "Compute the FFT",
-          "Calculate filter response",
-          "Extract maximum response"}};
-    double cumulated_details_times[num_steps-1][max_num_details];
-    #endif
-
     void printTime(double time, const std::string prefix, const  std::string label) {
         static const int labelWidth = 50;
         static const int precision = 3;
@@ -211,12 +193,8 @@ namespace cv {
         double endTime = CycleTimer::currentSeconds();
         cumulated_times[step] += endTime - startTime;
     }
-    void updateTimeDetail(double *startTime, int step, int step_detail) {
-        double endTime = CycleTimer::currentSeconds();
-        cumulated_details_times[step][step_detail] += endTime - *startTime;
-        *startTime = endTime;
-    }
-    void printTimes() {
+
+    void printAverageTimes() {
         if (frame != 1) {
             // Clear previous times
             for (int i = 0; i < total_lines; i++) {
@@ -237,6 +215,31 @@ namespace cv {
             #endif
         }
     }
+
+    // TIME == 2: Detailed view
+    #if TIME == 2
+    static const int max_num_details = 11;
+    const int num_steps_details[num_steps - 1] = {11, 0, 0, 0};
+    const std::string steps_details_labels[num_steps - 1][max_num_details] =
+        {{"Extract and pre-process the patch",
+          "Non-compressed custom descriptors",
+          "Compressed descriptors",
+          "Compressed custom descritors",
+          "Compress features and KRSL",
+          "Copy KRLS",
+          "Merge all features",
+          "Compute the gaussian kernel",
+          "Compute the FFT",
+          "Calculate filter response",
+          "Extract maximum response"}};
+    double cumulated_details_times[num_steps-1][max_num_details];
+
+    void updateTimeDetail(double *startTime, int step, int step_detail) {
+        double endTime = CycleTimer::currentSeconds();
+        cumulated_details_times[step][step_detail] += endTime - *startTime;
+        *startTime = endTime;
+    }
+    #endif
     #endif
   };
 
@@ -258,14 +261,14 @@ namespace cv {
     for (int i = 0; i < num_steps; i++) {
         cumulated_times[i] = 0;
     }
-    #endif
     #if TIME == 2
     for (int i = 0; i < num_steps - 1; i++) {
         total_lines += num_steps_details[i];
         for (int j = 0; j < max_num_details; j++) {
             cumulated_details_times[i][j] = 0;
         }
-}
+    }
+    #endif
     #endif
   }
 
@@ -619,7 +622,7 @@ namespace cv {
     #if TIME
     updateTime(startLeastSquares, 3);
     updateTime(startUpdate, 4);
-    printTimes();
+    printAverageTimes();
     #endif
 
     return true;
