@@ -42,6 +42,17 @@
 #include "precomp.hpp"
 #include "featureColorName.cpp"
 #include <complex>
+#include "cycleTimer.h"
+
+#define TIME 1
+
+inline void printTime(double* startTime, const char* prompt) {
+    double endTime = CycleTimer::currentSeconds();
+
+    printf("%s:    %.4f ms\n", prompt, 1000.f * (endTime - *startTime));
+
+    *startTime = endTime;
+}
 
 /*---------------------------
 |  TrackerKCFModel
@@ -69,9 +80,9 @@ namespace cv {
   /*
  * Prototype
  */
-  class TrackerKCFImpl : public TrackerKCF {
+  class TackerKCFImplSequential : public TrackerKCF {
   public:
-    TrackerKCFImpl( const TrackerKCF::Params &parameters = TrackerKCF::Params() );
+    TackerKCFImplSequential( const TrackerKCF::Params &parameters = TrackerKCF::Params() );
     void read( const FileNode& /*fn*/ );
     void write( FileStorage& /*fs*/ ) const;
     void setFeatureExtractor(void (*f)(const Mat, const Rect, Mat&), bool pca_func = false);
@@ -162,9 +173,9 @@ namespace cv {
  * Constructor
  */
   Ptr<TrackerKCF> TrackerKCF::createTracker(const TrackerKCF::Params &parameters){
-      return Ptr<TrackerKCFImpl>(new TrackerKCFImpl(parameters));
+      return Ptr<TackerKCFImplSequential>(new TackerKCFImplSequential(parameters));
   }
-  TrackerKCFImpl::TrackerKCFImpl( const TrackerKCF::Params &parameters ) :
+  TackerKCFImplSequential::TackerKCFImplSequential( const TrackerKCF::Params &parameters ) :
       params( parameters )
   {
     isInit = false;
@@ -174,11 +185,11 @@ namespace cv {
 
   }
 
-  void TrackerKCFImpl::read( const cv::FileNode& fn ){
+  void TackerKCFImplSequential::read( const cv::FileNode& fn ){
     params.read( fn );
   }
 
-  void TrackerKCFImpl::write( cv::FileStorage& fs ) const {
+  void TackerKCFImplSequential::write( cv::FileStorage& fs ) const {
     params.write( fs );
   }
 
@@ -189,7 +200,9 @@ namespace cv {
    * - creating a gaussian response for the training ground-truth
    * - perform FFT to the gaussian response
    */
-  bool TrackerKCFImpl::initImpl( const Mat& /*image*/, const Rect2d& boundingBox ){
+  bool TackerKCFImplSequential::initImpl( const Mat& /*image*/, const Rect2d& boundingBox ){
+    double startInit = CycleTimer::currentSeconds();
+
     frame=0;
     roi = boundingBox;
 
@@ -258,13 +271,17 @@ namespace cv {
     );
 
     // TODO: return true only if roi inside the image
+    #ifdef TIME
+      printTime(&startInit,"Initialization");
+    #endif
     return true;
   }
 
   /*
    * Main part of the KCF algorithm
    */
-  bool TrackerKCFImpl::updateImpl( const Mat& image, Rect2d& boundingBox ){
+  bool TackerKCFImplSequential::updateImpl( const Mat& image, Rect2d& boundingBox ){
+    double startUpdate = CycleTimer::currentSeconds();
     double minVal, maxVal;	// min-max response
     Point minLoc,maxLoc;	// min-max location
 
@@ -275,6 +292,7 @@ namespace cv {
     // resize the image whenever needed
     if(resizeImage)resize(img,img,Size(img.cols/2,img.rows/2));
 
+    double startDetection = CycleTimer::currentSeconds();
     // detection part
     if(frame>0){
 
@@ -338,6 +356,11 @@ namespace cv {
       roi.x+=(maxLoc.x-roi.width/2+1);
       roi.y+=(maxLoc.y-roi.height/2+1);
     }
+    #ifdef TIME
+      printTime(&startDetection,"---> Detection");
+    #endif
+
+    double startPatches = CycleTimer::currentSeconds();
 
     // update the bounding box
     boundingBox.x=(resizeImage?roi.x*2:roi.x)+(resizeImage?roi.width*2:roi.width)/4;
@@ -375,6 +398,12 @@ namespace cv {
       Z[1]=(1.0-params.interp_factor)*Z[1]+params.interp_factor*X[1];
     }
 
+    #ifdef TIME
+      printTime(&startPatches,"---> Extracting patches");
+    #endif
+
+    double startCompression = CycleTimer::currentSeconds();
+
     if(params.desc_pca !=0 || use_custom_extractor_pca){
       // initialize the vector of Mat variables
       if(frame==0){
@@ -394,6 +423,12 @@ namespace cv {
       x = X[1];
     else
       merge(X,2,x);
+
+    #ifdef TIME
+        printTime(&startCompression,"---> Feature compression");
+    #endif
+
+    double startLeastSquares = CycleTimer::currentSeconds();
 
     // initialize some required Mat variables
     if(frame==0){
@@ -438,6 +473,12 @@ namespace cv {
     }
 
     frame++;
+    #ifdef TIME
+        printTime(&startLeastSquares,"---> Least Squares Regression");
+    #endif
+    #ifdef TIME
+      printTime(&startUpdate,"Total for this frame");
+    #endif
     return true;
   }
 
@@ -449,7 +490,7 @@ namespace cv {
   /*
    * hann window filter
    */
-  void TrackerKCFImpl::createHanningWindow(OutputArray dest, const cv::Size winSize, const int type) const {
+  void TackerKCFImplSequential::createHanningWindow(OutputArray dest, const cv::Size winSize, const int type) const {
       CV_Assert( type == CV_32FC1 || type == CV_64FC1 );
 
       dest.create(winSize, type);
@@ -487,11 +528,11 @@ namespace cv {
   /*
    * simplification of fourier transform function in opencv
    */
-  void inline TrackerKCFImpl::fft2(const Mat src, Mat & dest) const {
+  void inline TackerKCFImplSequential::fft2(const Mat src, Mat & dest) const {
     dft(src,dest,DFT_COMPLEX_OUTPUT);
   }
 
-  void inline TrackerKCFImpl::fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const {
+  void inline TackerKCFImplSequential::fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const {
     split(src, layers_data);
 
     for(int i=0;i<src.channels();i++){
@@ -502,14 +543,14 @@ namespace cv {
   /*
    * simplification of inverse fourier transform function in opencv
    */
-  void inline TrackerKCFImpl::ifft2(const Mat src, Mat & dest) const {
+  void inline TackerKCFImplSequential::ifft2(const Mat src, Mat & dest) const {
     idft(src,dest,DFT_SCALE+DFT_REAL_OUTPUT);
   }
 
   /*
    * Point-wise multiplication of two Multichannel Mat data
    */
-  void inline TrackerKCFImpl::pixelWiseMult(const std::vector<Mat> src1, const std::vector<Mat>  src2, std::vector<Mat>  & dest, const int flags, const bool conjB) const {
+  void inline TackerKCFImplSequential::pixelWiseMult(const std::vector<Mat> src1, const std::vector<Mat>  src2, std::vector<Mat>  & dest, const int flags, const bool conjB) const {
     for(unsigned i=0;i<src1.size();i++){
       mulSpectrums(src1[i], src2[i], dest[i],flags,conjB);
     }
@@ -518,7 +559,7 @@ namespace cv {
   /*
    * Combines all channels in a multi-channels Mat data into a single channel
    */
-  void inline TrackerKCFImpl::sumChannels(std::vector<Mat> src, Mat & dest) const {
+  void inline TackerKCFImplSequential::sumChannels(std::vector<Mat> src, Mat & dest) const {
     dest=src[0].clone();
     for(unsigned i=1;i<src.size();i++){
       dest+=src[i];
@@ -528,7 +569,7 @@ namespace cv {
   /*
    * obtains the projection matrix using PCA
    */
-  void inline TrackerKCFImpl::updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix, double pca_rate, int compressed_sz,
+  void inline TackerKCFImplSequential::updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix, double pca_rate, int compressed_sz,
                                                      std::vector<Mat> & layers_pca,std::vector<Scalar> & average, Mat pca_data, Mat new_cov, Mat w, Mat u, Mat vt) const {
     CV_Assert(compressed_sz<=src.channels());
 
@@ -563,7 +604,7 @@ namespace cv {
   /*
    * compress the features
    */
-  void inline TrackerKCFImpl::compress(const Mat proj_matrix, const Mat src, Mat & dest, Mat & data, Mat & compressed) const {
+  void inline TackerKCFImplSequential::compress(const Mat proj_matrix, const Mat src, Mat & dest, Mat & data, Mat & compressed) const {
     data=src.reshape(1,src.rows*src.cols);
     compressed=data*proj_matrix;
     dest=compressed.reshape(proj_matrix.cols,src.rows).clone();
@@ -572,7 +613,7 @@ namespace cv {
   /*
    * obtain the patch and apply hann window filter to it
    */
-  bool TrackerKCFImpl::getSubWindow(const Mat img, const Rect _roi, Mat& feat, Mat& patch, TrackerKCF::MODE desc) const {
+  bool TackerKCFImplSequential::getSubWindow(const Mat img, const Rect _roi, Mat& feat, Mat& patch, TrackerKCF::MODE desc) const {
 
     Rect region=_roi;
 
@@ -628,7 +669,7 @@ namespace cv {
   /*
    * get feature using external function
    */
-  bool TrackerKCFImpl::getSubWindow(const Mat img, const Rect _roi, Mat& feat, void (*f)(const Mat, const Rect, Mat& )) const{
+  bool TackerKCFImplSequential::getSubWindow(const Mat img, const Rect _roi, Mat& feat, void (*f)(const Mat, const Rect, Mat& )) const{
 
     // return false if roi is outside the image
     if((_roi.x+_roi.width<0)
@@ -659,7 +700,7 @@ namespace cv {
 
   /* Convert BGR to ColorNames
    */
-  void TrackerKCFImpl::extractCN(Mat patch_data, Mat & cnFeatures) const {
+  void TackerKCFImplSequential::extractCN(Mat patch_data, Mat & cnFeatures) const {
     Vec3b & pixel = patch_data.at<Vec3b>(0,0);
     unsigned index;
 
@@ -683,7 +724,7 @@ namespace cv {
   /*
    *  dense gauss kernel function
    */
-  void TrackerKCFImpl::denseGaussKernel(const double sigma, const Mat x_data, const Mat y_data, Mat & k_data,
+  void TackerKCFImplSequential::denseGaussKernel(const double sigma, const Mat x_data, const Mat y_data, Mat & k_data,
                                         std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf ) const {
     double normX, normY;
 
@@ -725,7 +766,7 @@ namespace cv {
    * http://stackoverflow.com/questions/10420454/shift-like-matlab-function-rows-or-columns-of-a-matrix-in-opencv
    */
   // circular shift one row from up to down
-  void TrackerKCFImpl::shiftRows(Mat& mat) const {
+  void TackerKCFImplSequential::shiftRows(Mat& mat) const {
 
       Mat temp;
       Mat m;
@@ -741,7 +782,7 @@ namespace cv {
   }
 
   // circular shift n rows from up to down if n > 0, -n rows from down to up if n < 0
-  void TrackerKCFImpl::shiftRows(Mat& mat, int n) const {
+  void TackerKCFImplSequential::shiftRows(Mat& mat, int n) const {
       if( n < 0 ) {
         n = -n;
         flip(mat,mat,0);
@@ -757,7 +798,7 @@ namespace cv {
   }
 
   //circular shift n columns from left to right if n > 0, -n columns from right to left if n < 0
-  void TrackerKCFImpl::shiftCols(Mat& mat, int n) const {
+  void TackerKCFImplSequential::shiftCols(Mat& mat, int n) const {
       if(n < 0){
         n = -n;
         flip(mat,mat,1);
@@ -775,7 +816,7 @@ namespace cv {
   /*
    * calculate the detection response
    */
-  void TrackerKCFImpl::calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data) const {
+  void TackerKCFImplSequential::calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data) const {
     //alpha f--> 2channels ; k --> 1 channel;
     mulSpectrums(alphaf_data,kf_data,spec_data,0,false);
     ifft2(spec_data,response_data);
@@ -784,7 +825,7 @@ namespace cv {
   /*
    * calculate the detection response for splitted form
    */
-  void TrackerKCFImpl::calcResponse(const Mat alphaf_data, const Mat _alphaf_den, const Mat kf_data, Mat & response_data, Mat & spec_data, Mat & spec2_data) const {
+  void TackerKCFImplSequential::calcResponse(const Mat alphaf_data, const Mat _alphaf_den, const Mat kf_data, Mat & response_data, Mat & spec_data, Mat & spec2_data) const {
 
     mulSpectrums(alphaf_data,kf_data,spec_data,0,false);
 
@@ -803,7 +844,7 @@ namespace cv {
     ifft2(spec2_data,response_data);
   }
 
-  void TrackerKCFImpl::setFeatureExtractor(void (*f)(const Mat, const Rect, Mat&), bool pca_func){
+  void TackerKCFImplSequential::setFeatureExtractor(void (*f)(const Mat, const Rect, Mat&), bool pca_func){
     if(pca_func){
       extractor_pca.push_back(f);
       use_custom_extractor_pca = true;

@@ -8,8 +8,6 @@ using namespace std;
 int main(int argc, char **argv)
 {
     // Set up tracker.
-    // Instead of MIL, you can also use
-    // BOOSTING, KCF, TLD, MEDIANFLOW or GOTURN
     Ptr<Tracker> tracker = Tracker::create( "KCF" );
 
     // Read video
@@ -45,7 +43,7 @@ int main(int argc, char **argv)
         rectangle(frame, bbox, Scalar( 255, 0, 0 ), 2, 1 );
 
         // Display result
-        imshow("Tracking", frame);
+        //imshow("Tracking", frame);
         int k = waitKey(1);
         if(k == 27) break;
 
