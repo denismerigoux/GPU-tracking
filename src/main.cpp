@@ -1,6 +1,6 @@
 // Standard include files
+#include "tracker.cpp"
 #include <opencv2/opencv.hpp>
-#include <opencv2/tracking.hpp>
 
 using namespace cv;
 using namespace std;
