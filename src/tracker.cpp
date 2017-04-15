@@ -41,6 +41,7 @@
 
 #include "precomp.hpp"
 #include "trackerKCF.cpp"
+#include "trackerKCFparallel.cpp"
 
 #undef BOILERPLATE_CODE
 #define BOILERPLATE_CODE(name,classname)\
