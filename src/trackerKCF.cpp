@@ -219,7 +219,7 @@ namespace cv {
     // TIME == 2: Detailed view
     #if TIME == 2
     static const int max_num_details = 11;
-    const int num_steps_details[num_steps - 1] = {11, 6, 0, 0};
+    const int num_steps_details[num_steps - 1] = {10, 6, 3, 6};
     const std::string steps_details_labels[num_steps - 1][max_num_details] =
         // Detection
         {{"Extract and pre-process the patch",
@@ -227,7 +227,6 @@ namespace cv {
           "Compressed descriptors",
           "Compressed custom descritors",
           "Compress features and KRSL",
-          "Copy KRLS",
           "Merge all features",
           "Compute the gaussian kernel",
           "Compute the FFT",
@@ -239,7 +238,18 @@ namespace cv {
           "Non-compressed custom descriptors",
           "Compressed descriptors",
           "Compressed custom descriptors",
-          "Update training data"}};
+          "Update training data"},
+         // Compression
+         {"Update projection matrix",
+          "Compress",
+          "Merge all features"},
+         // Least Squares
+         {"Initialization",
+          "Calculate alphas",
+          "Compute FFT",
+          "Add a small value",
+          "New Alphaf",
+          "Update RLS model"}};
     double cumulated_details_times[num_steps-1][max_num_details];
 
     void updateTimeDetail(double *startTime, int step, int step_detail) {
@@ -449,15 +459,11 @@ namespace cv {
         compress(proj_mtx,Z[0],Zc[0],data_temp,compress_data);
       }
 
-      #if TIME == 2
-      updateTimeDetail(&startDetectionDetail, 0, 4);
-      #endif
-
       // copy the compressed KRLS model
       Zc[1] = Z[1];
 
       #if TIME == 2
-      updateTimeDetail(&startDetectionDetail, 0, 5);
+      updateTimeDetail(&startDetectionDetail, 0, 4);
       #endif
 
       // merge all features
@@ -473,14 +479,14 @@ namespace cv {
       }
 
       #if TIME == 2
-      updateTimeDetail(&startDetectionDetail, 0, 6);
+      updateTimeDetail(&startDetectionDetail, 0, 5);
       #endif
 
       //compute the gaussian kernel
       denseGaussKernel(params.sigma,x,z,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
 
       #if TIME == 2
-      updateTimeDetail(&startDetectionDetail, 0, 7);
+      updateTimeDetail(&startDetectionDetail, 0, 6);
       #endif
 
       // compute the fourier transform of the kernel
@@ -488,7 +494,7 @@ namespace cv {
       if(frame==1)spec2=Mat_<Vec2d >(kf.rows, kf.cols);
 
       #if TIME == 2
-      updateTimeDetail(&startDetectionDetail, 0, 8);
+      updateTimeDetail(&startDetectionDetail, 0, 7);
       #endif
 
       // calculate filter response
@@ -498,7 +504,7 @@ namespace cv {
         calcResponse(alphaf,kf,response, spec);
 
       #if TIME == 2
-      updateTimeDetail(&startDetectionDetail, 0, 9);
+      updateTimeDetail(&startDetectionDetail, 0, 8);
       #endif
 
       // extract the maximum response
@@ -507,7 +513,7 @@ namespace cv {
       roi.y+=(maxLoc.y-roi.height/2+1);
 
       #if TIME == 2
-      updateTimeDetail(&startDetectionDetail, 0, 10);
+      updateTimeDetail(&startDetectionDetail, 0, 9);
       #endif
     }
 
@@ -518,7 +524,7 @@ namespace cv {
     #endif
 
     #if TIME == 2
-    double startPatchesDetail = CycleTimer::currentSeconds();
+    double startPatchesDetail = startPatches;
     #endif
 
     // update the bounding box
@@ -589,6 +595,10 @@ namespace cv {
     double startCompression = CycleTimer::currentSeconds();
     #endif
 
+    #if TIME == 2
+    double startCompressionDetail = startCompression;
+    #endif
+
 
     if(params.desc_pca !=0 || use_custom_extractor_pca){
       // initialize the vector of Mat variables
@@ -599,7 +609,16 @@ namespace cv {
 
       // feature compression
       updateProjectionMatrix(Z[0],old_cov_mtx,proj_mtx,params.pca_learning_rate,params.compressed_size,layers_pca_data,average_data,data_pca, new_covar,w_data,u_data,vt_data);
+
+      #if TIME == 2
+      updateTimeDetail(&startCompressionDetail, 2, 0);
+      #endif
+
       compress(proj_mtx,X[0],X[0],data_temp,compress_data);
+
+      #if TIME == 2
+      updateTimeDetail(&startCompressionDetail, 2, 1);
+      #endif
     }
 
     // merge all features
@@ -610,11 +629,19 @@ namespace cv {
     else
       merge(X,2,x);
 
+    #if TIME == 2
+    updateTimeDetail(&startCompressionDetail, 2, 2);
+    #endif
+
     #if TIME
     updateTime(startCompression, 2);
     double startLeastSquares = CycleTimer::currentSeconds();
     #endif
 
+
+    #if TIME == 2
+    double startLeastSquaresDetail = startLeastSquares;
+    #endif
 
     // initialize some required Mat variables
     if(frame==0){
@@ -625,12 +652,29 @@ namespace cv {
       new_alphaf=Mat_<Vec2d >(yf.rows, yf.cols);
     }
 
+    #if TIME == 2
+    updateTimeDetail(&startLeastSquaresDetail, 3, 0);
+    #endif
+
     // Kernel Regularized Least-Squares, calculate alphas
     denseGaussKernel(params.sigma,x,x,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
 
+    #if TIME == 2
+    updateTimeDetail(&startLeastSquaresDetail, 3, 1);
+    #endif
+
     // compute the fourier transform of the kernel and add a small value
     fft2(k,kf);
+
+    #if TIME == 2
+    updateTimeDetail(&startLeastSquaresDetail, 3, 2);
+    #endif
+
     kf_lambda=kf+params.lambda;
+
+    #if TIME == 2
+    updateTimeDetail(&startLeastSquaresDetail, 3, 3);
+    #endif
 
     double den;
     if(params.split_coeff){
@@ -649,6 +693,10 @@ namespace cv {
       }
     }
 
+    #if TIME == 2
+    updateTimeDetail(&startLeastSquaresDetail, 3, 4);
+    #endif
+
     // update the RLS model
     if(frame==0){
       alphaf=new_alphaf.clone();
@@ -657,6 +705,10 @@ namespace cv {
       alphaf=(1.0-params.interp_factor)*alphaf+params.interp_factor*new_alphaf;
       if(params.split_coeff)alphaf_den=(1.0-params.interp_factor)*alphaf_den+params.interp_factor*new_alphaf_den;
     }
+
+    #if TIME == 2
+    updateTimeDetail(&startLeastSquaresDetail, 3, 5);
+    #endif
 
     frame++;
     #if TIME
