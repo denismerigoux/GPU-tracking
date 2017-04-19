@@ -12,3 +12,4 @@ Makefile
 CMakeFiles/
 tests/*
 main
+build

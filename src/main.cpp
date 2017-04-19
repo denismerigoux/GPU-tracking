@@ -5,37 +5,25 @@
 using namespace cv;
 using namespace std;
 
-int main(int argc, char **argv)
-{
-    // Set up tracker.
-    Ptr<Tracker> tracker = Tracker::create( "KCF" );
+void track(bool parallel, VideoCapture &video, Rect2d bbox) {
+    //TODO: Check correctness
 
-    // Read video
-    VideoCapture video("tests/chaplin.mp4");
-
-    // Check video is open
-    if(!video.isOpened())
-    {
-        cout << "Could not read video file" << endl;
-        return 1;
+    Ptr<Tracker> tracker;
+    if (parallel) {
+        tracker = new TackerKCFImplParallel(TackerKCFImplParallel::Params());
+    }
+    else {
+        tracker = new TackerKCFImplSequential(TackerKCFImplSequential::Params());
     }
 
     // Read first frame.
     Mat frame;
     video.read(frame);
 
-    // Define an initial bounding box
-    Rect2d bbox(587, 223, 286, 720);
-
-    // Uncomment the line below if you
-    // want to choose the bounding box
-    // bbox = selectROI(frame, false);
-
     // Initialize tracker with first frame and bounding box
     tracker->init(frame, bbox);
 
-    while(video.read(frame))
-    {
+    while(video.read(frame)) {
         // Update tracking results
         tracker->update(frame, bbox);
 
@@ -48,6 +36,33 @@ int main(int argc, char **argv)
         if(k == 27) break;
 
     }
+}
+
+int main(int argc, char **argv)
+{
+    // Read video
+    VideoCapture video("tests/chaplin.mp4");
+
+    // Check video is open
+    if(!video.isOpened())
+    {
+        cout << "Could not read video file" << endl;
+        return 1;
+    }
+
+    // Define an initial bounding box
+    Rect2d bbox(587, 223, 286, 720);
+
+    // bbox = selectROI(frame, false);
+
+    cout << "=== Sequential ===" << endl;
+    track(false, video, bbox);
+
+    // Reset video
+    video.set(CV_CAP_PROP_POS_AVI_RATIO , 0);
+
+    cout << "=== Parallel ===" << endl;
+    track(true, video, bbox);
 
     return 0;
 
