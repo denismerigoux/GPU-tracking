@@ -14,7 +14,7 @@ list( APPEND CUDA_NVCC_FLAGS "-O3 --gpu-architecture compute_35 -std=c++11")
 
 SET(GCC_COVERAGE_COMPILE_FLAGS "-std=c++11 -Wunused-function")
 SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}" )
-cuda_add_executable( main src/main.cpp src/trackerCUDAhelper.cu)
+cuda_add_executable( main src/main.cpp src/trackerKCFparallel.cu)
 
 
 target_link_libraries( main ${OpenCV_LIBS})

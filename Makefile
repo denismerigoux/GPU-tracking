@@ -1,4 +1,4 @@
-ghc: src/main.cpp src/trackerCUDAhelper.cu src/trackerCUDAhelper.h src/trackerKCFparallel.cpp CMakeLists.txt
+ghc: src/main.cpp src/trackerKCFparallel.cpp src/trackerKCFparallel.cu CMakeLists.txt
 	mkdir -p build
 	cd build && \
 	cmake -D OpenCV_DIR=/tmp/dmerigou/opencv-3.2.0/build2 -DCMAKE_BUILD_TYPE=RELEASE .. && \
