@@ -8,7 +8,6 @@ proposal/proposal.pdf
 *.blg
 *.cmake
 CMakeCache.txt
-Makefile
 CMakeFiles/
 tests/*
 main

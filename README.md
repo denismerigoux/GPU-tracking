@@ -9,9 +9,15 @@ Read the following tutorials:
 
 ## Build
 
-    cmake .
-    make
+```
+mkdir build
+cd build
+cmake -DOpenCV_DIR=/tmp/dmerigou/opencv-3.2.0/build2 -DCMAKE_BUILD_TYPE=RELEASE ..
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/tmp/dmerigou/ffmpeg-3.2.4/build/lib make
+```
 
 ## Run
 
-    ./main
+```
+./main
+```
