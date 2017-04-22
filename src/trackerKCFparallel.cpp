@@ -42,6 +42,7 @@
 #include "precomp.hpp"
 #include <complex>
 #include "cycleTimer.h"
+#include "trackerCUDAhelper.h"
 
 #define TIME 2
 
@@ -266,6 +267,8 @@ namespace cv {
     }
     #endif
     #endif
+
+    helperFunction();
   }
 
   void TackerKCFImplParallel::read( const cv::FileNode& fn ){
