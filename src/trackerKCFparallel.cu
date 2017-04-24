@@ -1,4 +1,6 @@
 #include "trackerKCFparallel.cpp"
+#include <opencv2/cudaarithm.hpp>
+#include "dft.cu"
 
 /*---------------------------
 |  TrackerKCFModel
@@ -537,7 +539,7 @@ namespace cv {
       * simplification of inverse fourier transform function in opencv
       */
      void inline TackerKCFImplParallel::ifft2(const Mat src, Mat & dest) const {
-       idft(src,dest,DFT_SCALE+DFT_REAL_OUTPUT);
+       cuda::dft(src,dest,src.size(),DFT_SCALE+DFT_REAL_OUTPUT|DFT_INVERSE);
      }
 
      /*

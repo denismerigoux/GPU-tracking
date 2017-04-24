@@ -16,5 +16,7 @@ SET(GCC_COVERAGE_COMPILE_FLAGS "-std=c++11 -Wunused-function")
 SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}" )
 cuda_add_executable( main src/main.cpp src/trackerKCFparallel.cu)
 
+SET( CUFFT_LIB /usr/local/cuda/lib64/libcufft.so.8.0)
 
-target_link_libraries( main ${OpenCV_LIBS})
+
+target_link_libraries( main ${OpenCV_LIBS} ${CUFFT_LIB})
