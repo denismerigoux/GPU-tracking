@@ -542,7 +542,7 @@ namespace cv {
       * simplification of inverse fourier transform function in opencv
       */
      void inline TackerKCFImplParallel::ifft2(const Mat src, Mat & dest) {
-       if (!ifft2_gpuMats_init) {
+      /* if (!ifft2_gpuMats_init) {
            ifft2_src = new cuda::GpuMat(src);
            ifft2_dest = new cuda::GpuMat(dest);
            ifft2_gpuMats_init = true;
@@ -555,9 +555,9 @@ namespace cv {
        cuda::dft(*ifft2_src, *ifft2_dest, ifft2_src->size(),
          DFT_SCALE+DFT_REAL_OUTPUT|DFT_INVERSE|DFT_DOUBLE);
        //ifft2_src->download(src);
-       ifft2_dest->download(dest);
+       ifft2_dest->download(dest);*/
 
-       //idft(src,dest,DFT_SCALE+DFT_REAL_OUTPUT);
+       idft(src,dest,DFT_SCALE+DFT_REAL_OUTPUT);
      }
 
      /*
