@@ -118,8 +118,11 @@ public:
     {
         GpuMat src = getInputMat(_src, stream);
 
-        CV_Assert( src.type() == CV_32FC1 || src.type() == CV_32FC2 );
+        CV_Assert( src.type() == CV_32FC1 || src.type() == CV_32FC2
+            || src.type() == CV_64FC2 || src.type() == CV_64FC1);
         CV_Assert( is_complex_input == (src.channels() == 2) );
+
+        bool double_precision = (src.type() == CV_64FC1) || (src.type() == CV_64FC2);
 
         // Make sure here we work with the continuous input,
         // as CUFFT can't handle gaps
@@ -142,34 +145,70 @@ public:
         {
             if (is_complex_output)
             {
-                createContinuous(dft_size, CV_32FC2, _dst);
-                GpuMat dst = _dst.getGpuMat();
+                if (double_precision)
+                {
+                    createContinuous(dft_size, CV_64FC2, _dst);
+                    GpuMat dst = _dst.getGpuMat();
 
-                cufftSafeCall(cufftExecC2C(
-                        plan, src_cont.ptr<cufftComplex>(), dst.ptr<cufftComplex>(),
-                        is_inverse ? CUFFT_INVERSE : CUFFT_FORWARD));
+                    cufftSafeCall(cufftExecZ2Z(
+                            plan, src_cont.ptr<cufftDoubleComplex>(), dst.ptr<cufftDoubleComplex>(),
+                            is_inverse ? CUFFT_INVERSE : CUFFT_FORWARD));
+                } else
+                {
+                    createContinuous(dft_size, CV_32FC2, _dst);
+                    GpuMat dst = _dst.getGpuMat();
+
+                    cufftSafeCall(cufftExecC2C(
+                            plan, src_cont.ptr<cufftComplex>(), dst.ptr<cufftComplex>(),
+                            is_inverse ? CUFFT_INVERSE : CUFFT_FORWARD));
+                }
             }
             else
             {
-                createContinuous(dft_size, CV_32F, _dst);
-                GpuMat dst = _dst.getGpuMat();
+                if (double_precision)
+                {
+                    createContinuous(dft_size, CV_64F, _dst);
+                    GpuMat dst = _dst.getGpuMat();
 
-                cufftSafeCall(cufftExecC2R(
-                        plan, src_cont.ptr<cufftComplex>(), dst.ptr<cufftReal>()));
+                    cufftSafeCall(cufftExecZ2D(
+                            plan, src_cont.ptr<cufftDoubleComplex>(), dst.ptr<cufftDoubleReal>()));
+                } else
+                {
+                    createContinuous(dft_size, CV_32F, _dst);
+                    GpuMat dst = _dst.getGpuMat();
+
+                    cufftSafeCall(cufftExecC2R(
+                            plan, src_cont.ptr<cufftComplex>(), dst.ptr<cufftReal>()));
+                }
             }
         }
         else
         {
-            // We could swap dft_size for efficiency. Here we must reflect it
-            if (dft_size == dft_size_opt)
-                createContinuous(Size(dft_size.width / 2 + 1, dft_size.height), CV_32FC2, _dst);
-            else
-                createContinuous(Size(dft_size.width, dft_size.height / 2 + 1), CV_32FC2, _dst);
+            if (double_precision)
+            {
+                // We could swap dft_size for efficiency. Here we must reflect it
+                if (dft_size == dft_size_opt)
+                    createContinuous(Size(dft_size.width / 2 + 1, dft_size.height), CV_64FC2, _dst);
+                else
+                    createContinuous(Size(dft_size.width, dft_size.height / 2 + 1), CV_64FC2, _dst);
 
-            GpuMat dst = _dst.getGpuMat();
+                GpuMat dst = _dst.getGpuMat();
 
-            cufftSafeCall(cufftExecR2C(
-                              plan, src_cont.ptr<cufftReal>(), dst.ptr<cufftComplex>()));
+                cufftSafeCall(cufftExecD2Z(
+                                  plan, src_cont.ptr<cufftDoubleReal>(), dst.ptr<cufftDoubleComplex>()));
+            } else
+            {
+                // We could swap dft_size for efficiency. Here we must reflect it
+                if (dft_size == dft_size_opt)
+                    createContinuous(Size(dft_size.width / 2 + 1, dft_size.height), CV_32FC2, _dst);
+                else
+                    createContinuous(Size(dft_size.width, dft_size.height / 2 + 1), CV_32FC2, _dst);
+
+                GpuMat dst = _dst.getGpuMat();
+
+                cufftSafeCall(cufftExecR2C(
+                                  plan, src_cont.ptr<cufftReal>(), dst.ptr<cufftComplex>()));
+            }
         }
 
         if (is_scaled_dft)
