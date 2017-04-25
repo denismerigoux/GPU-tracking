@@ -8,6 +8,17 @@ using namespace std;
 void track(bool parallel, VideoCapture &video, Rect2d bbox) {
     //TODO: Check correctness
 
+    if (parallel) {
+        cout << "=== Parallel ===" << endl;
+    }
+    else {
+        cout << "=== Sequential ===" << endl;
+    }
+
+    // Reset video
+    video.set(CV_CAP_PROP_POS_AVI_RATIO , 0);
+
+
     Ptr<Tracker> tracker;
     if (parallel) {
         tracker = new TackerKCFImplParallel(TackerKCFImplParallel::Params());
@@ -62,14 +73,8 @@ int main(int argc, char **argv)
 
     // bbox = selectROI(frame, false);
 
-    // cout << "=== Sequential ===" << endl;
-    // track(false, video, bbox);
-    //
-    // // Reset video
-    // video.set(CV_CAP_PROP_POS_AVI_RATIO , 0);
-
-    cout << "=== Parallel ===" << endl;
-    track(true, video, bbox);
+    track(false, video, bbox); // Sequential
+    track(true, video, bbox); // Parallel
 
     return 0;
 

@@ -30,6 +30,7 @@ namespace cv {
          params( parameters )
      {
        isInit = false;
+       ifft2_gpuMats_init = false;
        resizeImage = false;
        use_custom_extractor_pca = false;
        use_custom_extractor_npca = false;
@@ -64,7 +65,7 @@ namespace cv {
       * - creating a gaussian response for the training ground-truth
       * - perform FFT to the gaussian response
       */
-     bool TackerKCFImplParallel::initImpl( const Mat& /*image*/, const Rect2d& boundingBox ){
+     bool TackerKCFImplParallel::initImpl( const Mat& image, const Rect2d& boundingBox ){
        #if TIME
        double startInit = CycleTimer::currentSeconds();
        #endif
@@ -540,13 +541,21 @@ namespace cv {
      /*
       * simplification of inverse fourier transform function in opencv
       */
-     void inline TackerKCFImplParallel::ifft2(const Mat src, Mat & dest) const {
-       cuda::GpuMat _src(src);
-       cuda::GpuMat _dest(dest);
-       cuda::dft(_src, _dest, _src.size(),
+     void inline TackerKCFImplParallel::ifft2(const Mat src, Mat & dest) {
+       if (!ifft2_gpuMats_init) {
+           ifft2_src = new cuda::GpuMat(src);
+           ifft2_dest = new cuda::GpuMat(dest);
+           ifft2_gpuMats_init = true;
+       }
+       else {
+           ifft2_src->upload(src);
+           //ifft2_dest->upload(dest);
+       }
+
+       cuda::dft(*ifft2_src, *ifft2_dest, ifft2_src->size(),
          DFT_SCALE+DFT_REAL_OUTPUT|DFT_INVERSE|DFT_DOUBLE);
-       //_src.download(src);
-       _dest.download(dest);
+       //ifft2_src->download(src);
+       ifft2_dest->download(dest);
 
        //idft(src,dest,DFT_SCALE+DFT_REAL_OUTPUT);
      }
@@ -729,7 +738,7 @@ namespace cv {
       *  dense gauss kernel function
       */
      void TackerKCFImplParallel::denseGaussKernel(const double sigma, const Mat x_data, const Mat y_data, Mat & k_data,
-                                           std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf ) const {
+                                           std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf ) {
        double normX, normY;
 
        fft2(x_data,xf_data,layers_data);
@@ -820,7 +829,7 @@ namespace cv {
      /*
       * calculate the detection response
       */
-     void TackerKCFImplParallel::calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data) const {
+     void TackerKCFImplParallel::calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data) {
        //alpha f--> 2channels ; k --> 1 channel;
        mulSpectrums(alphaf_data,kf_data,spec_data,0,false);
        ifft2(spec_data,response_data);
@@ -829,7 +838,7 @@ namespace cv {
      /*
       * calculate the detection response for splitted form
       */
-     void TackerKCFImplParallel::calcResponse(const Mat alphaf_data, const Mat _alphaf_den, const Mat kf_data, Mat & response_data, Mat & spec_data, Mat & spec2_data) const {
+     void TackerKCFImplParallel::calcResponse(const Mat alphaf_data, const Mat _alphaf_den, const Mat kf_data, Mat & response_data, Mat & spec_data, Mat & spec2_data) {
 
        mulSpectrums(alphaf_data,kf_data,spec_data,0,false);
 
