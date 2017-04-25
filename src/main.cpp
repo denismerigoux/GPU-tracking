@@ -23,18 +23,25 @@ void track(bool parallel, VideoCapture &video, Rect2d bbox) {
     // Initialize tracker with first frame and bounding box
     tracker->init(frame, bbox);
 
-    while(video.read(frame)) {
+    int frame_id = 0;
+
+    while (video.read(frame)) {
         // Update tracking results
-        tracker->update(frame, bbox);
+        bool updated = tracker->update(frame, bbox);
+
+        if (!updated) {
+            return;
+        }
 
         // Draw bounding box
         rectangle(frame, bbox, Scalar( 255, 0, 0 ), 2, 1 );
 
+        frame_id++;
+
         // Display result
         //imshow("Tracking", frame);
-        int k = waitKey(1);
-        if(k == 27) break;
-
+        //int k = waitKey(1);
+        //if(k == 27) break;
     }
 }
 
@@ -46,7 +53,7 @@ int main(int argc, char **argv)
     // Check video is open
     if(!video.isOpened())
     {
-        cout << "Could not read video file" << endl;
+        cerr << "Could not read video file" << endl;
         return 1;
     }
 

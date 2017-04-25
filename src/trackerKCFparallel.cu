@@ -1,6 +1,8 @@
-#include "trackerKCFparallel.cpp"
+#include "trackerKCFparallel.hpp"
 #include <opencv2/cudaarithm.hpp>
 #include "dft.cu"
+
+#define returnFromUpdate() {fprintf(stderr, "Error in %s line %d while updating frame %d\n", __FILE__, __LINE__, frame); return false;}
 
 /*---------------------------
 |  TrackerKCFModel
@@ -173,7 +175,7 @@ namespace cv {
          // extract and pre-process the patch
          // get non compressed descriptors
          for(unsigned i=0;i<descriptors_npca.size()-extractor_npca.size();i++){
-           if(!getSubWindow(img,roi, features_npca[i], img_Patch, descriptors_npca[i]))return false;
+           if(!getSubWindow(img,roi, features_npca[i], img_Patch, descriptors_npca[i]))returnFromUpdate();
          }
 
          #if TIME == 2
@@ -182,7 +184,7 @@ namespace cv {
 
          //get non-compressed custom descriptors
          for(unsigned i=0,j=(unsigned)(descriptors_npca.size()-extractor_npca.size());i<extractor_npca.size();i++,j++){
-           if(!getSubWindow(img,roi, features_npca[j], extractor_npca[i]))return false;
+           if(!getSubWindow(img,roi, features_npca[j], extractor_npca[i]))returnFromUpdate();
          }
          if(features_npca.size()>0)merge(features_npca,X[1]);
 
@@ -192,7 +194,7 @@ namespace cv {
 
          // get compressed descriptors
          for(unsigned i=0;i<descriptors_pca.size()-extractor_pca.size();i++){
-           if(!getSubWindow(img,roi, features_pca[i], img_Patch, descriptors_pca[i]))return false;
+           if(!getSubWindow(img,roi, features_pca[i], img_Patch, descriptors_pca[i]))returnFromUpdate();
          }
 
 
@@ -202,7 +204,7 @@ namespace cv {
 
          //get compressed custom descriptors
          for(unsigned i=0,j=(unsigned)(descriptors_pca.size()-extractor_pca.size());i<extractor_pca.size();i++,j++){
-           if(!getSubWindow(img,roi, features_pca[j], extractor_pca[i]))return false;
+           if(!getSubWindow(img,roi, features_pca[j], extractor_pca[i]))returnFromUpdate();
          }
          if(features_pca.size()>0)merge(features_pca,X[0]);
 
@@ -297,7 +299,7 @@ namespace cv {
        // extract the patch for learning purpose
        // get non compressed descriptors
        for(unsigned i=0;i<descriptors_npca.size()-extractor_npca.size();i++){
-         if(!getSubWindow(img,roi, features_npca[i], img_Patch, descriptors_npca[i]))return false;
+         if(!getSubWindow(img,roi, features_npca[i], img_Patch, descriptors_npca[i]))returnFromUpdate();
        }
 
        #if TIME == 2
@@ -307,7 +309,7 @@ namespace cv {
 
        //get non-compressed custom descriptors
        for(unsigned i=0,j=(unsigned)(descriptors_npca.size()-extractor_npca.size());i<extractor_npca.size();i++,j++){
-         if(!getSubWindow(img,roi, features_npca[j], extractor_npca[i]))return false;
+         if(!getSubWindow(img,roi, features_npca[j], extractor_npca[i]))returnFromUpdate();
        }
        if(features_npca.size()>0)merge(features_npca,X[1]);
 
@@ -317,7 +319,7 @@ namespace cv {
 
        // get compressed descriptors
        for(unsigned i=0;i<descriptors_pca.size()-extractor_pca.size();i++){
-         if(!getSubWindow(img,roi, features_pca[i], img_Patch, descriptors_pca[i]))return false;
+         if(!getSubWindow(img,roi, features_pca[i], img_Patch, descriptors_pca[i]))returnFromUpdate();
        }
 
        #if TIME == 2
@@ -326,7 +328,7 @@ namespace cv {
 
        //get compressed custom descriptors
        for(unsigned i=0,j=(unsigned)(descriptors_pca.size()-extractor_pca.size());i<extractor_pca.size();i++,j++){
-         if(!getSubWindow(img,roi, features_pca[j], extractor_pca[i]))return false;
+         if(!getSubWindow(img,roi, features_pca[j], extractor_pca[i]))returnFromUpdate();
        }
        if(features_pca.size()>0)merge(features_pca,X[0]);
 
@@ -541,11 +543,10 @@ namespace cv {
      void inline TackerKCFImplParallel::ifft2(const Mat src, Mat & dest) const {
        cuda::GpuMat _src(src);
        cuda::GpuMat _dest(dest);
-       cuda::dft(_src,_dest,_src.size(),DFT_SCALE+DFT_REAL_OUTPUT|DFT_INVERSE|DFT_DOUBLE);
-       _src.download(src);
+       cuda::dft(_src, _dest, _src.size(),
+         DFT_SCALE+DFT_REAL_OUTPUT|DFT_INVERSE|DFT_DOUBLE);
+       //_src.download(src);
        _dest.download(dest);
-       _src.release();
-       _dest.release();
 
        //idft(src,dest,DFT_SCALE+DFT_REAL_OUTPUT);
      }
