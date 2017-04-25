@@ -242,6 +242,6 @@ namespace cv {
     #endif
   };
 
- 
+
 
 } /* namespace cv */

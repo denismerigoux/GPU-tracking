@@ -68,10 +68,13 @@ enum DftFlags {
     DFT_COMPLEX_INPUT  = 64
 };
 
+#define DFT_DOUBLE 1024
+
 class DFTImplCustom
 {
     Size dft_size, dft_size_opt;
-    bool is_1d_input, is_row_dft, is_scaled_dft, is_inverse, is_complex_input, is_complex_output;
+    bool is_1d_input, is_row_dft, is_scaled_dft, is_inverse, is_complex_input,
+        is_complex_output, is_double_precision;
 
     cufftType dft_type;
     cufftHandle plan;
@@ -86,7 +89,10 @@ public:
           is_inverse((flags & DFT_INVERSE) != 0),
           is_complex_input((flags & DFT_COMPLEX_INPUT) != 0),
           is_complex_output(!(flags & DFT_REAL_OUTPUT)),
-          dft_type(!is_complex_input ? CUFFT_R2C : (is_complex_output ? CUFFT_C2C : CUFFT_C2R))
+          is_double_precision((flags & DFT_DOUBLE) != 0),
+          dft_type(!is_complex_input ? (is_double_precision ? CUFFT_D2Z : CUFFT_R2C)
+           : (is_complex_output ? (is_double_precision ? CUFFT_Z2Z : CUFFT_C2C)
+            : (is_double_precision? CUFFT_Z2D : CUFFT_C2R)))
     {
         // We don't support unpacked output (in the case of real input)
         CV_Assert( !(flags & DFT_COMPLEX_OUTPUT) );
@@ -122,8 +128,6 @@ public:
             || src.type() == CV_64FC2 || src.type() == CV_64FC1);
         CV_Assert( is_complex_input == (src.channels() == 2) );
 
-        bool double_precision = (src.type() == CV_64FC1) || (src.type() == CV_64FC2);
-
         // Make sure here we work with the continuous input,
         // as CUFFT can't handle gaps
         GpuMat src_cont;
@@ -145,8 +149,9 @@ public:
         {
             if (is_complex_output)
             {
-                if (double_precision)
+                if (is_double_precision)
                 {
+
                     createContinuous(dft_size, CV_64FC2, _dst);
                     GpuMat dst = _dst.getGpuMat();
 
@@ -165,7 +170,7 @@ public:
             }
             else
             {
-                if (double_precision)
+                if (is_double_precision)
                 {
                     createContinuous(dft_size, CV_64F, _dst);
                     GpuMat dst = _dst.getGpuMat();
@@ -184,7 +189,7 @@ public:
         }
         else
         {
-            if (double_precision)
+            if (is_double_precision)
             {
                 // We could swap dft_size for efficiency. Here we must reflect it
                 if (dft_size == dft_size_opt)

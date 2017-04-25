@@ -55,11 +55,11 @@ int main(int argc, char **argv)
 
     // bbox = selectROI(frame, false);
 
-    //cout << "=== Sequential ===" << endl;
-    //track(false, video, bbox);
-
-    // Reset video
-    //video.set(CV_CAP_PROP_POS_AVI_RATIO , 0);
+    // cout << "=== Sequential ===" << endl;
+    // track(false, video, bbox);
+    //
+    // // Reset video
+    // video.set(CV_CAP_PROP_POS_AVI_RATIO , 0);
 
     cout << "=== Parallel ===" << endl;
     track(true, video, bbox);
