@@ -79,7 +79,7 @@ namespace cv {
     void createHanningWindow(OutputArray dest, const cv::Size winSize, const int type) const;
     void inline fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const;
     void inline fft2(const Mat src, Mat & dest) const;
-    void inline ifft2(const Mat src, Mat & dest) const;
+    void inline ifft2(const Mat src, Mat & dest);
     void inline pixelWiseMult(const std::vector<Mat> src1, const std::vector<Mat>  src2, std::vector<Mat>  & dest, const int flags, const bool conjB=false) const;
     void inline sumChannels(std::vector<Mat> src, Mat & dest) const;
     void inline updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix,double pca_rate, int compressed_sz,
@@ -89,9 +89,9 @@ namespace cv {
     bool getSubWindow(const Mat img, const Rect roi, Mat& feat, void (*f)(const Mat, const Rect, Mat& )) const;
     void extractCN(Mat patch_data, Mat & cnFeatures) const;
     void denseGaussKernel(const double sigma, const Mat , const Mat y_data, Mat & k_data,
-                          std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf ) const;
-    void calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data) const;
-    void calcResponse(const Mat alphaf_data, const Mat alphaf_den_data, const Mat kf_data, Mat & response_data, Mat & spec_data, Mat & spec2_data) const;
+                          std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf );
+    void calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data);
+    void calcResponse(const Mat alphaf_data, const Mat alphaf_den_data, const Mat kf_data, Mat & response_data, Mat & spec_data, Mat & spec2_data);
 
     void shiftRows(Mat& mat) const;
     void shiftRows(Mat& mat, int n) const;
@@ -144,6 +144,12 @@ namespace cv {
     bool resizeImage; // resize the image whenever needed and the patch size is large
 
     int frame;
+
+    // GpuMats
+    bool ifft2_gpuMats_init;
+    cuda::GpuMat *ifft2_src;
+    cuda::GpuMat *ifft2_dest;
+
 
     #if TIME
     static const int num_steps = 5;

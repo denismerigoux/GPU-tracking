@@ -5,8 +5,24 @@
 using namespace cv;
 using namespace std;
 
-void track(bool parallel, VideoCapture &video, Rect2d bbox) {
-    //TODO: Check correctness
+inline bool compare_bounding_boxes(const Rect2d &bbox1, const Rect2d &bbox2) {
+    return bbox1.tl().x == bbox2.tl().x
+        && bbox1.tl().y == bbox2.tl().y
+        && bbox1.br().x == bbox2.br().x
+        && bbox1.br().y == bbox2.br().y;
+}
+
+void track(bool parallel, VideoCapture &video, Rect2d bbox, bool display, Rect2d *bounding_boxes, bool check_correctness) {
+    if (parallel) {
+        cout << "=== Parallel ===" << endl;
+    }
+    else {
+        cout << "=== Sequential ===" << endl;
+    }
+
+    // Reset video
+    video.set(CV_CAP_PROP_POS_AVI_RATIO , 0);
+
 
     Ptr<Tracker> tracker;
     if (parallel) {
@@ -23,18 +39,55 @@ void track(bool parallel, VideoCapture &video, Rect2d bbox) {
     // Initialize tracker with first frame and bounding box
     tracker->init(frame, bbox);
 
-    while(video.read(frame)) {
+    int frame_id = 0;
+
+    while (video.read(frame)) {
         // Update tracking results
-        tracker->update(frame, bbox);
+        bool updated = tracker->update(frame, bbox);
 
-        // Draw bounding box
-        rectangle(frame, bbox, Scalar( 255, 0, 0 ), 2, 1 );
+        if (!updated) {
+            return;
+        }
 
-        // Display result
-        //imshow("Tracking", frame);
-        int k = waitKey(1);
-        if(k == 27) break;
+        if (check_correctness) {
+            if (!parallel) {
+                bounding_boxes[frame_id] = bbox;
+            }
+            else {
+                if (!compare_bounding_boxes(bbox, bounding_boxes[frame_id])) {
+                    cerr << "Correctness failed at frame " << frame_id << endl;
+                    cerr << "Bounding box mismatch:" << endl;
+                    cerr << "* Sequential: "<< bbox << endl;
+                    cerr << "* Parallel: "<< bounding_boxes[frame_id] << endl;
+                    return;
+                }
+            }
+        }
 
+        frame_id++;
+
+        if (display) {
+            // Draw bounding box
+            rectangle(frame, bbox, Scalar( 255, 0, 0 ), 2, 1 );
+
+            // Display result
+            imshow("Tracking", frame);
+            int k = waitKey(1);
+            if(k == 27) break;
+        }
+    }
+}
+
+void test_implementation(bool sequential, bool parallel, VideoCapture &video, Rect2d bbox, bool display) {
+    if (sequential && parallel) {
+        int num_frames = video.get(CV_CAP_PROP_FRAME_COUNT);
+        Rect2d bounding_boxes[num_frames];
+
+        track(false, video, bbox, display, bounding_boxes, true); // Sequential
+        track(true, video, bbox, display, bounding_boxes, true); // Parallel
+    }
+    else {
+        track(parallel, video, bbox, display, NULL, false); // Sequential
     }
 }
 
@@ -46,7 +99,7 @@ int main(int argc, char **argv)
     // Check video is open
     if(!video.isOpened())
     {
-        cout << "Could not read video file" << endl;
+        cerr << "Could not read video file" << endl;
         return 1;
     }
 
@@ -55,14 +108,7 @@ int main(int argc, char **argv)
 
     // bbox = selectROI(frame, false);
 
-    // cout << "=== Sequential ===" << endl;
-    // track(false, video, bbox);
-    //
-    // // Reset video
-    // video.set(CV_CAP_PROP_POS_AVI_RATIO , 0);
-
-    cout << "=== Parallel ===" << endl;
-    track(true, video, bbox);
+    test_implementation(true, true, video, bbox, false);
 
     return 0;
 
