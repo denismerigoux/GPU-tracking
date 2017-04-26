@@ -1,22 +1,33 @@
 # GPU-Tracking
 
-## Installation
+## 15-618 Project information
+
+### Proposal
+
+See [the project proposal](proposal/proposal.pdf)
+
+### Checkpoint
+
+See [the project checkpoint writeup](checkpoint/checkpoint.pdf)
+
+## Usage
+
+### Installation
 
 Read the following tutorials:
 
     http://docs.opencv.org/trunk/d7/d9f/tutorial_linux_install.html
     https://github.com/opencv/opencv_contrib
 
-## Build
+Build scripts are available in the `build_scripts` folder.
 
-```
-mkdir build
-cd build
-cmake -DOpenCV_DIR=/tmp/dmerigou/opencv-3.2.0/build2 -DCMAKE_BUILD_TYPE=RELEASE ..
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/tmp/dmerigou/ffmpeg-3.2.4/build/lib make
-```
+### Build
 
-## Run
+The `Makefile` provided builds the project on `ghc39.andrew.cmu.edu`. For other machines and configurations, you should adjust the paths in the `Makefile` and in the `CMakeLists.txt`
+
+### Run
+
+Make sure the `tests` folder contains the video `chaplin.mp4`.
 
 ```
 ./main
