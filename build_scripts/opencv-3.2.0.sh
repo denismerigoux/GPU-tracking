@@ -1,12 +1,36 @@
 #!/bin/bash
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/tmp/dmerigou/ffmpeg-3.2.4/build/lib:/tmp/dmerigou/libv4l/usr/lib/libv4l
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/tmp/dmerigou/ffmpeg-3.2.4/build/lib/pkgconfig
-export PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR:/tmp/dmerigou/ffmpeg-3.2.4/build/lib
+set -e
 
-cmake -D CMAKE_BUILD_TYPE=RELEASE -D WITH_CUDA=ON -D ENABLE_FAST_MATH=1 -D CUDA_FAST_MATH=1 \
-    -DWITH_CUBLAS=1 -DOPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-3.2.0/modules \
-    -DWITH_NVCUVID=ON -DBUILD_PERF_TESTS=OFF -DBUILD_TESTS=OFF -DWITH_LIBV4L=ON -DWITH_V4L=ON \
-    -DCUDA_HOST_COMPILER=/usr/bin/g++ -DFFMPEG_INCLUDE_DIRS=/tmp/dmerigou/ffmpeg-3.2.4/build/include \
-    -DFFMPEG_LIBRARY_DIRS=/tmp/dmerigou/ffmpeg-3.2.4/build/lib  -DCMAKE_CXX_FLAGS="-D__STDC_CONSTANT_MACROS" \
+BUILD_PATH=/afs/andrew.cmu.edu/usr14/ideutel/builds-15618-project
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$BUILD_PATH/lib:/usr/lib64/:/usr/lib64/nvidia/
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$BUILD_PATH/lib/pkgconfig
+export PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR:$BUILD_PATH/lib
+
+cmake \
+    -DCMAKE_BUILD_TYPE=RELEASE \
+    -DWITH_CUDA=ON \
+    -DENABLE_FAST_MATH=ON \
+    -DCUDA_FAST_MATH=ON \
+    -DWITH_CUBLAS=1 \
+    -DOPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-3.2.0/modules \
+    -DWITH_NVCUVID=ON \
+    -DBUILD_PERF_TESTS=OFF \
+    -DBUILD_TESTS=OFF \
+    -DWITH_LIBV4L=ON \
+    -DWITH_V4L=ON \
+    -DCUDA_HOST_COMPILER=/usr/bin/g++ \
+    -DFFMPEG_INCLUDE_DIRS=$BUILD_PATH/include \
+    -DFFMPEG_LIBRARY_DIRS=$BUILD_PATH/lib \
+    -DCMAKE_CXX_FLAGS="-D__STDC_CONSTANT_MACROS" \
+    -DCMAKE_INSTALL_PREFIX=$BUILD_PATH \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_FAT_JAVA_LIB=OFF \
+    -DBUILD_opencv_apps=OFF \
+    -DBUILD_DOCS=OFF \
+    -DBUILD_PACKAGE=OFF \
+    -DBUILD_WITH_DEBUG_INFO=OFF \
     ..
+make
+make install/strip
