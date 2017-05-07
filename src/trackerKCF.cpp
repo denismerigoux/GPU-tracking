@@ -44,7 +44,7 @@
 #include <complex>
 #include "cycleTimer.h"
 
-#define TIME 2
+#define TIME 0
 
 #if TIME
 #include <iomanip>

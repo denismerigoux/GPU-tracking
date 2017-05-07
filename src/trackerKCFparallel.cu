@@ -30,7 +30,6 @@ namespace cv {
          params( parameters )
      {
        isInit = false;
-       ifft2_gpuMats_init = false;
        resizeImage = false;
        use_custom_extractor_pca = false;
        use_custom_extractor_npca = false;
@@ -542,22 +541,25 @@ namespace cv {
       * simplification of inverse fourier transform function in opencv
       */
      void inline TackerKCFImplParallel::ifft2(const Mat src, Mat & dest) {
-      /* if (!ifft2_gpuMats_init) {
-           ifft2_src = new cuda::GpuMat(src);
-           ifft2_dest = new cuda::GpuMat(dest);
-           ifft2_gpuMats_init = true;
-       }
-       else {
-           ifft2_src->upload(src);
-           //ifft2_dest->upload(dest);
+       if (ifft2_src.empty()) {
+         // Initialize GPUMat
+         cuda::createContinuous(src.size(), src.type(), ifft2_src);
        }
 
-       cuda::dft(*ifft2_src, *ifft2_dest, ifft2_src->size(),
-         DFT_SCALE+DFT_REAL_OUTPUT|DFT_INVERSE|DFT_DOUBLE);
-       //ifft2_src->download(src);
-       ifft2_dest->download(dest);*/
+       ifft2_src.upload(src);
 
-       idft(src,dest,DFT_SCALE+DFT_REAL_OUTPUT);
+       cuda::dft(ifft2_src, ifft2_dest, ifft2_src.size(),
+         (DFT_SCALE + DFT_REAL_OUTPUT) | DFT_INVERSE | DFT_DOUBLE);
+
+       ifft2_dest.download(dest);
+
+       Mat dest2;
+       idft(src, dest2, DFT_SCALE + DFT_REAL_OUTPUT);
+       std::cout << dest.at<double>(0,0) << std::endl;
+       std::cout << dest2.at<double>(0,0) << std::endl;
+       std::cout << std::endl;
+       std::cout << dest.at<double>(0,1) << std::endl;
+       std::cout << dest2.at<double>(0,1) << std::endl;
      }
 
      /*

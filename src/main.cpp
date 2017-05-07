@@ -12,7 +12,7 @@ inline bool compare_bounding_boxes(const Rect2d &bbox1, const Rect2d &bbox2) {
         && bbox1.br().y == bbox2.br().y;
 }
 
-void track(bool parallel, VideoCapture &video, Rect2d bbox, bool display, Rect2d *bounding_boxes, bool check_correctness) {
+void track(bool parallel, VideoCapture &video, Rect2d bbox, bool display, Rect2d *bounding_boxes, bool check_correctness, int num_frames) {
     if (parallel) {
         cout << "=== Parallel ===" << endl;
     }
@@ -42,6 +42,9 @@ void track(bool parallel, VideoCapture &video, Rect2d bbox, bool display, Rect2d
     int frame_id = 0;
 
     while (video.read(frame)) {
+        if (frame_id == num_frames) {
+          return;
+        }
         // Update tracking results
         bool updated = tracker->update(frame, bbox);
 
@@ -55,10 +58,10 @@ void track(bool parallel, VideoCapture &video, Rect2d bbox, bool display, Rect2d
             }
             else {
                 if (!compare_bounding_boxes(bbox, bounding_boxes[frame_id])) {
-                    cerr << "Correctness failed at frame " << frame_id << endl;
-                    cerr << "Bounding box mismatch:" << endl;
-                    cerr << "* Sequential: "<< bbox << endl;
-                    cerr << "* Parallel: "<< bounding_boxes[frame_id] << endl;
+                    cerr << "Correctness failed at frame " << frame_id << endl
+                        << "Bounding box mismatch:" << endl
+                        << "* Sequential: "<< bbox << endl
+                        << "* Parallel: "<< bounding_boxes[frame_id] << endl;
                     return;
                 }
             }
@@ -78,16 +81,16 @@ void track(bool parallel, VideoCapture &video, Rect2d bbox, bool display, Rect2d
     }
 }
 
-void test_implementation(bool sequential, bool parallel, VideoCapture &video, Rect2d bbox, bool display) {
+void test_implementation(bool sequential, bool parallel, VideoCapture &video, Rect2d bbox, bool display, int num_frames) {
     if (sequential && parallel) {
         int num_frames = video.get(CV_CAP_PROP_FRAME_COUNT);
         Rect2d bounding_boxes[num_frames];
 
-        track(false, video, bbox, display, bounding_boxes, true); // Sequential
-        track(true, video, bbox, display, bounding_boxes, true); // Parallel
+        track(false, video, bbox, display, bounding_boxes, true, num_frames); // Sequential
+        track(true, video, bbox, display, bounding_boxes, true, num_frames); // Parallel
     }
     else {
-        track(parallel, video, bbox, display, NULL, false); // Sequential
+        track(parallel, video, bbox, display, NULL, false, num_frames); // Sequential
     }
 }
 
@@ -108,7 +111,7 @@ int main(int argc, char **argv)
 
     // bbox = selectROI(frame, false);
 
-    test_implementation(true, true, video, bbox, false);
+    test_implementation(false, true, video, bbox, false, 1);
 
     return 0;
 

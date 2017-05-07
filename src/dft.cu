@@ -65,10 +65,9 @@ void ___cufftSafeCall(int err, const char* file, const int line, const char* fun
 }
 
 enum DftFlags {
-    DFT_COMPLEX_INPUT  = 64
+    DFT_COMPLEX_INPUT = 64,
+    DFT_DOUBLE = 1024
 };
-
-#define DFT_DOUBLE 1024
 
 class DFTImplCustom
 {
@@ -151,7 +150,6 @@ public:
             {
                 if (is_double_precision)
                 {
-
                     createContinuous(dft_size, CV_64FC2, _dst);
                     GpuMat dst = _dst.getGpuMat();
 

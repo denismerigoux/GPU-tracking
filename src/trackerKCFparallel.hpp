@@ -42,8 +42,9 @@
 #include "precomp.hpp"
 #include <complex>
 #include "cycleTimer.h"
+#include <opencv2/core/cuda.hpp>
 
-#define TIME 2
+#define TIME 0
 
 #if TIME
 #include <iomanip>
@@ -146,9 +147,8 @@ namespace cv {
     int frame;
 
     // GpuMats
-    bool ifft2_gpuMats_init;
-    cuda::GpuMat *ifft2_src;
-    cuda::GpuMat *ifft2_dest;
+    cuda::GpuMat ifft2_src;
+    cuda::GpuMat ifft2_dest;
 
 
     #if TIME
