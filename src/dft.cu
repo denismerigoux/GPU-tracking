@@ -81,7 +81,6 @@ class DFTImplCustom
 public:
     DFTImplCustom(Size dft_size, int flags)
         : dft_size(dft_size),
-          dft_size_opt(dft_size),
           is_1d_input((dft_size.height == 1) || (dft_size.width == 1)),
           is_row_dft((flags & DFT_ROWS) != 0),
           is_scaled_dft((flags & DFT_SCALE) != 0),
@@ -99,19 +98,10 @@ public:
         // We don't support real-to-real transform
         CV_Assert( is_complex_input || is_complex_output );
 
-        if (is_1d_input && !is_row_dft)
-        {
-            // If the source matrix is single column handle it as single row
-            dft_size_opt.width = std::max(dft_size.width, dft_size.height);
-            dft_size_opt.height = std::min(dft_size.width, dft_size.height);
-        }
+        // We do not support 1d input to simplify the code
+        CV_Assert( !is_1d_input );
 
-        CV_Assert( dft_size_opt.width > 1 );
-
-        if (is_1d_input || is_row_dft)
-            cufftSafeCall( cufftPlan1d(&plan, dft_size_opt.width, dft_type, dft_size_opt.height) );
-        else
-            cufftSafeCall( cufftPlan2d(&plan, dft_size_opt.height, dft_size_opt.width, dft_type) );
+        cufftSafeCall( cufftPlan2d(&plan, dft_size.height, dft_size.width, dft_type) );
     }
 
     ~DFTImplCustom()
@@ -129,18 +119,7 @@ public:
 
         // Make sure here we work with the continuous input,
         // as CUFFT can't handle gaps
-        GpuMat src_cont;
-        if (src.isContinuous())
-        {
-            src_cont = src;
-        }
-        else
-        {
-            BufferPool pool(stream);
-            src_cont.allocator = pool.getAllocator();
-            createContinuous(src.rows, src.cols, src.type(), src_cont);
-            src.copyTo(src_cont, stream);
-        }
+        CV_Assert( src.isContinuous() );
 
         cufftSafeCall( cufftSetStream(plan, StreamAccessor::getStream(stream)) );
 
@@ -154,15 +133,15 @@ public:
                     GpuMat dst = _dst.getGpuMat();
 
                     cufftSafeCall(cufftExecZ2Z(
-                            plan, src_cont.ptr<cufftDoubleComplex>(), dst.ptr<cufftDoubleComplex>(),
+                            plan, src.ptr<cufftDoubleComplex>(), dst.ptr<cufftDoubleComplex>(),
                             is_inverse ? CUFFT_INVERSE : CUFFT_FORWARD));
                 } else
                 {
-                    createContinuous(dft_size, CV_32FC2, _dst);
                     GpuMat dst = _dst.getGpuMat();
+                    CV_Assert( !dst.empty() );
 
                     cufftSafeCall(cufftExecC2C(
-                            plan, src_cont.ptr<cufftComplex>(), dst.ptr<cufftComplex>(),
+                            plan, src.ptr<cufftComplex>(), dst.ptr<cufftComplex>(),
                             is_inverse ? CUFFT_INVERSE : CUFFT_FORWARD));
                 }
             }
@@ -174,14 +153,14 @@ public:
                     GpuMat dst = _dst.getGpuMat();
 
                     cufftSafeCall(cufftExecZ2D(
-                            plan, src_cont.ptr<cufftDoubleComplex>(), dst.ptr<cufftDoubleReal>()));
+                            plan, src.ptr<cufftDoubleComplex>(), dst.ptr<cufftDoubleReal>()));
                 } else
                 {
                     createContinuous(dft_size, CV_32F, _dst);
                     GpuMat dst = _dst.getGpuMat();
 
                     cufftSafeCall(cufftExecC2R(
-                            plan, src_cont.ptr<cufftComplex>(), dst.ptr<cufftReal>()));
+                            plan, src.ptr<cufftComplex>(), dst.ptr<cufftReal>()));
                 }
             }
         }
@@ -189,33 +168,24 @@ public:
         {
             if (is_double_precision)
             {
-                // We could swap dft_size for efficiency. Here we must reflect it
-                if (dft_size == dft_size_opt)
-                    createContinuous(Size(dft_size.width / 2 + 1, dft_size.height), CV_64FC2, _dst);
-                else
-                    createContinuous(Size(dft_size.width, dft_size.height / 2 + 1), CV_64FC2, _dst);
-
                 GpuMat dst = _dst.getGpuMat();
+                CV_Assert( !dst.empty() );
 
                 cufftSafeCall(cufftExecD2Z(
-                                  plan, src_cont.ptr<cufftDoubleReal>(), dst.ptr<cufftDoubleComplex>()));
+                                  plan, src.ptr<cufftDoubleReal>(), dst.ptr<cufftDoubleComplex>()));
             } else
             {
-                // We could swap dft_size for efficiency. Here we must reflect it
-                if (dft_size == dft_size_opt)
-                    createContinuous(Size(dft_size.width / 2 + 1, dft_size.height), CV_32FC2, _dst);
-                else
-                    createContinuous(Size(dft_size.width, dft_size.height / 2 + 1), CV_32FC2, _dst);
+                createContinuous(Size(dft_size.width / 2 + 1, dft_size.height), CV_32FC2, _dst);
 
                 GpuMat dst = _dst.getGpuMat();
 
                 cufftSafeCall(cufftExecR2C(
-                                  plan, src_cont.ptr<cufftReal>(), dst.ptr<cufftComplex>()));
+                                  plan, src.ptr<cufftReal>(), dst.ptr<cufftComplex>()));
             }
         }
 
         if (is_scaled_dft)
-            cuda::multiply(_dst, Scalar::all(1. / dft_size.area()), _dst, 1, -1, stream);
+            cuda::divide(_dst, Scalar::all(dft_size.area()), _dst, 1, -1, stream);
     }
 };
 

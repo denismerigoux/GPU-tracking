@@ -48,6 +48,8 @@
 #include <typeinfo>
 #include "opencv2/core/hal/hal.hpp"
 
+#define TIME 2
+
 namespace cv
 {
 	extern const double ColorNames[][10];

@@ -83,6 +83,9 @@ void track(bool parallel, VideoCapture &video, Rect2d bbox, bool display, Rect2d
 
 void test_implementation(bool sequential, bool parallel, VideoCapture &video, Rect2d bbox, bool display, int num_frames) {
     if (sequential && parallel) {
+        if (num_frames < 0) {
+          num_frames = video.get(CV_CAP_PROP_FRAME_COUNT);
+        }
         Rect2d bounding_boxes[num_frames];
 
         track(false, video, bbox, display, bounding_boxes, true, num_frames); // Sequential

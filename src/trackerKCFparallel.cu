@@ -556,17 +556,6 @@ namespace cv {
        dft(src,dest,DFT_COMPLEX_OUTPUT);
      }
 
-     void inline TackerKCFImplParallel::cudafft2(const Mat src, Mat & dest) {
-       cuda::createContinuous(src.size(), src.type(), ifft2_src);
-
-       ifft2_src.upload(src);
-
-       cuda::dft(ifft2_src, ifft2_dest, ifft2_src.size(), DFT_DOUBLE);
-
-       ifft2_dest.download(dest);
-       cce2full(dest,dest);
-     }
-
      void inline TackerKCFImplParallel::fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const {
        split(src, layers_data);
 
@@ -578,14 +567,17 @@ namespace cv {
      void inline TackerKCFImplParallel::cudafft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) {
        split(src, layers_data);
 
-       for(int i=0;i<src.channels();i++){
-         cuda::createContinuous(layers_data[i].size(), layers_data[i].type(), ifft2_src);
+       if (fft2_src.empty()) {
+         cuda::createContinuous(layers_data[0].size(), layers_data[0].type(), fft2_src);
+         cuda::createContinuous(Size(layers_data[0].size().width/2+1, layers_data[0].size().height), CV_64FC2, fft2_dest);
+       }
 
-         ifft2_src.upload(layers_data[i]);
+       for (int i = 0; i < src.channels(); i++){
+         fft2_src.upload(layers_data[i]);
 
-         cuda::dft(ifft2_src, ifft2_dest, ifft2_src.size(), DFT_DOUBLE);
+         cuda::dft(fft2_src, fft2_dest, fft2_src.size(), DFT_DOUBLE);
 
-         ifft2_dest.download(dest[i]);
+         fft2_dest.download(dest[i]);
          cce2full(dest[i],dest[i]);
        }
      }
@@ -600,8 +592,13 @@ namespace cv {
 
      void inline TackerKCFImplParallel::cudaifft2(const Mat src, Mat & dest) {
        Mat src_cce;
-       full2cce(src,src_cce);
-       cuda::createContinuous(src_cce.size(), src_cce.type(), ifft2_src);
+       src_cce = src;
+       full2cce(src, src_cce);
+
+       if (ifft2_src.empty()) {
+         cuda::createContinuous(src_cce.size(), src_cce.type(), ifft2_src);
+         cuda::createContinuous(src_cce.size(), CV_64F, ifft2_dest);
+       }
 
        ifft2_src.upload(src_cce);
 
@@ -609,7 +606,6 @@ namespace cv {
          (DFT_SCALE + DFT_REAL_OUTPUT) | DFT_INVERSE | DFT_DOUBLE);
 
        ifft2_dest.download(dest);
-
      }
 
     // Expand half a matrix by inferring the complex conjugates of the cols to
@@ -817,15 +813,12 @@ namespace cv {
       */
      void TackerKCFImplParallel::denseGaussKernel(const double sigma, const Mat x_data, const Mat y_data, Mat & k_data,
                                            std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf ) {
-       double normX, normY;
+
+       double normX = norm(x_data, NORM_L2SQR);
+       double normY = norm(y_data, NORM_L2SQR);
 
        cudafft2(x_data,xf_data,layers_data);
        cudafft2(y_data,yf_data,layers_data);
-
-       normX=norm(x_data);
-       normX*=normX;
-       normY=norm(y_data);
-       normY*=normY;
 
        pixelWiseMult(xf_data,yf_data,xyf_v,0,true);
        sumChannels(xyf_v,xyf);
@@ -849,7 +842,7 @@ namespace cv {
 
        double sig=-1.0/(sigma*sigma);
        xy=sig*xy;
-       exp(xy,k_data);
+       exp(xy, k_data);
 
      }
 
