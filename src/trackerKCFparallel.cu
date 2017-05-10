@@ -21,6 +21,33 @@ namespace cv{
   };
 } /* namespace cv */
 
+namespace helper {
+    void MatType( Mat inputMat )
+    {
+    int inttype = inputMat.type();
+
+    std::string r, a;
+    uchar depth = inttype & CV_MAT_DEPTH_MASK;
+    uchar chans = 1 + (inttype >> CV_CN_SHIFT);
+    switch ( depth ) {
+        case CV_8U:  r = "8U";   a = "Mat.at<uchar>(y,x)"; break;
+        case CV_8S:  r = "8S";   a = "Mat.at<schar>(y,x)"; break;
+        case CV_16U: r = "16U";  a = "Mat.at<ushort>(y,x)"; break;
+        case CV_16S: r = "16S";  a = "Mat.at<short>(y,x)"; break;
+        case CV_32S: r = "32S";  a = "Mat.at<int>(y,x)"; break;
+        case CV_32F: r = "32F";  a = "Mat.at<float>(y,x)"; break;
+        case CV_64F: r = "64F";  a = "Mat.at<double>(y,x)"; break;
+        case CV_32FC2: r = "32FC2";  a = "Mat.at<complex float>(y,x)"; break;
+        case CV_64FC2: r = "64FC2";  a = "Mat.at<complex double>(y,x)"; break;
+        default:     r = "User"; a = "Mat.at<UKNOWN>(y,x)"; break;
+    }
+    r += "C";
+    r += (chans+'0');
+    std::cout << "Mat is of type " << r << " and should be accessed with " << a << std::endl;
+
+    }
+}
+
 namespace cv {
 
     /*
@@ -529,6 +556,17 @@ namespace cv {
        dft(src,dest,DFT_COMPLEX_OUTPUT);
      }
 
+     void inline TackerKCFImplParallel::cudafft2(const Mat src, Mat & dest) {
+       cuda::createContinuous(src.size(), src.type(), ifft2_src);
+
+       ifft2_src.upload(src);
+
+       cuda::dft(ifft2_src, ifft2_dest, ifft2_src.size(), DFT_DOUBLE);
+
+       ifft2_dest.download(dest);
+       cce2full(dest,dest);
+     }
+
      void inline TackerKCFImplParallel::fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const {
        split(src, layers_data);
 
@@ -537,30 +575,68 @@ namespace cv {
        }
      }
 
+     void inline TackerKCFImplParallel::cudafft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) {
+       split(src, layers_data);
+
+       for(int i=0;i<src.channels();i++){
+         cuda::createContinuous(layers_data[i].size(), layers_data[i].type(), ifft2_src);
+
+         ifft2_src.upload(layers_data[i]);
+
+         cuda::dft(ifft2_src, ifft2_dest, ifft2_src.size(), DFT_DOUBLE);
+
+         ifft2_dest.download(dest[i]);
+         cce2full(dest[i],dest[i]);
+       }
+     }
+
      /*
       * simplification of inverse fourier transform function in opencv
       */
-     void inline TackerKCFImplParallel::ifft2(const Mat src, Mat & dest) {
-       if (ifft2_src.empty()) {
-         // Initialize GPUMat
-         cuda::createContinuous(src.size(), src.type(), ifft2_src);
-       }
 
-       ifft2_src.upload(src);
+      void inline TackerKCFImplParallel::ifft2(const Mat src, Mat & dest) const {
+        idft(src,dest,DFT_SCALE+DFT_REAL_OUTPUT);
+      }
 
-       cuda::dft(ifft2_src, ifft2_dest, ifft2_src.size(),
+     void inline TackerKCFImplParallel::cudaifft2(const Mat src, Mat & dest) {
+       Mat src_cce;
+       full2cce(src,src_cce);
+       cuda::createContinuous(src_cce.size(), src_cce.type(), ifft2_src);
+
+       ifft2_src.upload(src_cce);
+
+       cuda::dft(ifft2_src, ifft2_dest, src.size(),
          (DFT_SCALE + DFT_REAL_OUTPUT) | DFT_INVERSE | DFT_DOUBLE);
 
        ifft2_dest.download(dest);
 
-       Mat dest2;
-       idft(src, dest2, DFT_SCALE + DFT_REAL_OUTPUT);
-       std::cout << dest.at<double>(0,0) << std::endl;
-       std::cout << dest2.at<double>(0,0) << std::endl;
-       std::cout << std::endl;
-       std::cout << dest.at<double>(0,1) << std::endl;
-       std::cout << dest2.at<double>(0,1) << std::endl;
      }
+
+    // Expand half a matrix by inferring the complex conjugates of the cols to
+    // complete the second half
+    void inline TackerKCFImplParallel::cce2full(const Mat src, Mat & dest) {
+        // Assume that the original size of the matrix was divisible by 2
+        Mat result(cv::Size((src.size().width-1)*2,src.size().height),src.type());
+        for (int j=0; j < (src.size().width-1)*2;j++) {
+            for (int i = 0; i < src.size().height;i++) {
+                if (j <src.size().width-1) {
+                    result.at<Vec2d>(i,j)[0] = src.at<Vec2d>(i,j)[0];
+                    result.at<Vec2d>(i,j)[1] = src.at<Vec2d>(i,j)[1];
+                } else {
+                    // Complex conjugate
+                    result.at<Vec2d>(i,j)[0] = src.at<Vec2d>(i,2*(src.size().width - 1) - j)[0];
+                    result.at<Vec2d>(i,j)[1] =  - src.at<Vec2d>(i,2*(src.size().width -1) - j)[1];
+                }
+            }
+        }
+        dest = result;
+    }
+
+    void inline TackerKCFImplParallel::full2cce(const Mat src, Mat & dest) {
+        //We take the first half of the matrix
+        cv::Rect roi(0, 0, src.size().width/2+1, src.size().height);
+        dest = src(roi);
+    }
 
      /*
       * Point-wise multiplication of two Multichannel Mat data
@@ -743,8 +819,8 @@ namespace cv {
                                            std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf ) {
        double normX, normY;
 
-       fft2(x_data,xf_data,layers_data);
-       fft2(y_data,yf_data,layers_data);
+       cudafft2(x_data,xf_data,layers_data);
+       cudafft2(y_data,yf_data,layers_data);
 
        normX=norm(x_data);
        normX*=normX;
@@ -753,7 +829,7 @@ namespace cv {
 
        pixelWiseMult(xf_data,yf_data,xyf_v,0,true);
        sumChannels(xyf_v,xyf);
-       ifft2(xyf,xyf);
+       cudaifft2(xyf,xyf);
 
        if(params.wrap_kernel){
          shiftRows(xyf, x_data.rows/2);

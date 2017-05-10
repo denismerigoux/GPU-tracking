@@ -44,7 +44,7 @@
 #include "cycleTimer.h"
 #include <opencv2/core/cuda.hpp>
 
-#define TIME 0
+#define TIME 2
 
 #if TIME
 #include <iomanip>
@@ -80,7 +80,12 @@ namespace cv {
     void createHanningWindow(OutputArray dest, const cv::Size winSize, const int type) const;
     void inline fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const;
     void inline fft2(const Mat src, Mat & dest) const;
-    void inline ifft2(const Mat src, Mat & dest);
+    void inline ifft2(const Mat src, Mat & dest) const;
+    void inline cudafft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data);
+    void inline cudafft2(const Mat src, Mat & dest);
+    void inline cudaifft2(const Mat src, Mat & dest);
+    void inline full2cce(const Mat src, Mat & dest);
+    void inline cce2full(const Mat src, Mat & dest);
     void inline pixelWiseMult(const std::vector<Mat> src1, const std::vector<Mat>  src2, std::vector<Mat>  & dest, const int flags, const bool conjB=false) const;
     void inline sumChannels(std::vector<Mat> src, Mat & dest) const;
     void inline updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix,double pca_rate, int compressed_sz,
