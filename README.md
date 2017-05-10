@@ -1,14 +1,7 @@
 # GPU-Tracking
 
-## 15-618 Project information
-
-### Proposal
-
-See [the project proposal](proposal/proposal.pdf)
-
-### Checkpoint
-
-See [the project checkpoint writeup](checkpoint/checkpoint.pdf)
+[Project website](https://denismerigoux.github.io/GPU-tracking/)
+------
 
 ## Usage
 
