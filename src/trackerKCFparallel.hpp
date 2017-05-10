@@ -79,13 +79,13 @@ namespace cv {
     void inline fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const;
     void inline fft2(const Mat src, Mat & dest) const;
     void inline ifft2(const Mat src, Mat & dest) const;
-    void inline cudafft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data);
+    void inline cudafft2(const cuda::GpuMat src, std::vector<cuda::GpuMat> & dest, std::vector<cuda::GpuMat> & layers_data);
     void inline cudafft2(const Mat src, Mat & dest);
-    void inline cudaifft2(const Mat src, Mat & dest);
+    void inline cudaifft2(const cuda::GpuMat src, cuda::GpuMat & dest);
     void inline full2cce(const Mat src, Mat & dest);
     void inline cce2full(const Mat src, Mat & dest);
-    void inline pixelWiseMult(const std::vector<Mat> src1, const std::vector<Mat>  src2, std::vector<Mat>  & dest, const int flags, const bool conjB=false) const;
-    void inline sumChannels(std::vector<Mat> src, Mat & dest) const;
+    void inline pixelWiseMult(const std::vector<cuda::GpuMat> src1, const std::vector<cuda::GpuMat>  src2, std::vector<cuda::GpuMat>  & dest, const int flags, const bool conjB) const;
+    void inline sumChannels(std::vector<cuda::GpuMat> src, cuda::GpuMat & dest) const;
     void inline updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix,double pca_rate, int compressed_sz,
                                        std::vector<Mat> & layers_pca,std::vector<Scalar> & average, Mat pca_data, Mat new_cov, Mat w, Mat u, Mat v) const;
     void inline compress(const Mat proj_matrix, const Mat src, Mat & dest, Mat & data, Mat & compressed) const;
