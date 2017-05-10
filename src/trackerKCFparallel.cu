@@ -641,6 +641,10 @@ namespace cv {
       */
      void inline TackerKCFImplParallel::updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix, double pca_rate, int compressed_sz,
                                                         std::vector<Mat> & layers_pca,std::vector<Scalar> & average, Mat pca_data, Mat new_cov, Mat w, Mat u, Mat vt) const {
+
+
+       double start = CycleTimer::currentSeconds();
+
        CV_Assert(compressed_sz<=src.channels());
 
        split(src,layers_pca);
@@ -650,15 +654,27 @@ namespace cv {
          layers_pca[i]-=average[i];
        }
 
+       double middle3 = CycleTimer::currentSeconds();
+       printTime(middle3 - start, "", "Before covariance");
+
        // calc covariance matrix
        merge(layers_pca,pca_data);
        pca_data=pca_data.reshape(1,src.rows*src.cols);
 
+       double middle4 = CycleTimer::currentSeconds();
+       printTime(middle4 - middle3, "", "Covariance matrix part 1");
+
        new_cov=1.0/(double)(src.rows*src.cols-1)*(pca_data.t()*pca_data);
        if(old_cov.rows==0)old_cov=new_cov.clone();
 
+       double middle = CycleTimer::currentSeconds();
+       printTime(middle - middle4, "", "Covariance matrix part 2");
+
        // calc PCA
        SVD::compute((1.0-pca_rate)*old_cov+pca_rate*new_cov, w, u, vt);
+
+       double middle1 = CycleTimer::currentSeconds();
+       printTime(middle1 - middle, "", "SVD");
 
        // extract the projection matrix
        proj_matrix=u(Rect(0,0,compressed_sz,src.channels())).clone();
@@ -669,6 +685,10 @@ namespace cv {
 
        // update the covariance matrix
        old_cov=(1.0-pca_rate)*old_cov+pca_rate*proj_matrix*proj_vars*proj_matrix.t();
+
+       double end = CycleTimer::currentSeconds();
+       printTime(end - middle1, "", "After SVD");
+       std::cout << std::endl;
      }
 
      /*
@@ -797,7 +817,6 @@ namespace cv {
      void TackerKCFImplParallel::denseGaussKernel(const double sigma, const Mat x_data, const Mat y_data, Mat & k_data,
                                            std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf ) {
 
-
       // First we download all the data onto the Gpu
 
       int num_channels = x_data.channels();
@@ -821,33 +840,33 @@ namespace cv {
        double normX = norm(x_data, NORM_L2SQR);
        double normY = norm(y_data, NORM_L2SQR);
 
-       //std::cout << "====== Beginning gaussian kernel =======" << std::endl;
-
-       //std::cout << "Matrix size before fft: " << x_data.size() << std::endl;
+       cv::cuda::Stream stream;
 
        split(x_data, layers_data);
        for (int i = 0; i < x_data.channels(); i++){
-           layers_data_gpu[i].upload(layers_data[i]);
+           layers_data_gpu[i].upload(layers_data[i], stream);
        }
+       stream.waitForCompletion();
 
        cudafft2(num_channels,xf_data_gpu,layers_data_gpu);
 
        split(y_data, layers_data);
        for (int i = 0; i < x_data.channels(); i++){
-           layers_data_gpu[i].upload(layers_data[i]);
+           layers_data_gpu[i].upload(layers_data[i], stream);
        }
+       stream.waitForCompletion();
 
        cudafft2(y_data.channels(),yf_data_gpu,layers_data_gpu);
 
-       //std::cout << "Matrix size after fft: " << yf_data_gpu[0].size() << std::endl;
 
        pixelWiseMult(xf_data_gpu,yf_data_gpu,xyf_v_gpu,0,true);
        sumChannels(xyf_v_gpu,xyf_c_gpu);
+
+
        cudaifft2(xyf_c_gpu,xyf_r_gpu);
 
-       //std::cout << "Matrix size after ifft: " << xyf_r_gpu.size() << std::endl;
-
        xyf_r_gpu.download(xyf);
+
 
        if(params.wrap_kernel){
          shiftRows(xyf, x_data.rows/2);

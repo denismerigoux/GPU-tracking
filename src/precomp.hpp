@@ -48,7 +48,7 @@
 #include <typeinfo>
 #include "opencv2/core/hal/hal.hpp"
 
-#define TIME 2
+#define TIME 0
 
 namespace cv
 {

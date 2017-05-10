@@ -113,7 +113,7 @@ int main(int argc, char **argv)
 
     // bbox = selectROI(frame, false);
 
-    test_implementation(false, true, video, bbox, false, -1);
+    test_implementation(false, true, video, bbox, false, 10);
 
     return 0;
 

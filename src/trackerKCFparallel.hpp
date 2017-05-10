@@ -44,9 +44,7 @@
 #include "cycleTimer.h"
 #include <opencv2/core/cuda.hpp>
 
-#if TIME
 #include <iomanip>
-#endif
 
 /*---------------------------
 |  TrackerKCF
@@ -163,6 +161,16 @@ namespace cv {
     std::vector<cuda::GpuMat> xyf_v_gpu;
 
 
+    void static printTime(double time, const std::string prefix, const  std::string label) {
+        static const int labelWidth = 50;
+        static const int precision = 3;
+        // Print the label
+        std::cout << prefix << std::left << std::setw(labelWidth) << label
+             << std::setfill(' ')
+        // Print the time
+             << std::fixed << std::setprecision(precision) << (1000. * time)
+             << "ms" << std::endl;
+    }
     #if TIME
     static const int num_steps = 5;
     int total_lines;
@@ -174,16 +182,6 @@ namespace cv {
 
     double cumulated_times[num_steps];
 
-    void printTime(double time, const std::string prefix, const  std::string label) {
-        static const int labelWidth = 50;
-        static const int precision = 3;
-        // Print the label
-        std::cout << prefix << std::left << std::setw(labelWidth) << label
-             << std::setfill(' ')
-        // Print the time
-             << std::fixed << std::setprecision(precision) << (1000. * time)
-             << "ms" << std::endl;
-    }
     void printInitializationTime(double startTime) {
         double endTime = CycleTimer::currentSeconds();
         printTime(endTime - startTime, "", "Initialization");
