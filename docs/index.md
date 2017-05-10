@@ -39,12 +39,12 @@ The table below gives the time (averaged over the number  taken by the baseline 
 |                          | Compressed custom descriptors       | 2.774           |
 |                          | Compress features and KRSL          | 9.372           |
 |                          | Merge all features                  | 1.558           |
-|                          | Compute the gaussian kernel         | 20.087          |
+|                          | **Compute the gaussian kernel**     | **20.087**      |
 |                          | Compute the FFT                     | 1.748           |
 |                          | Calculate filter response           | 3.101           |
 |                          | Extract maximum response            | 0.236           |
 |                          | _Total_                             | _47.48_         |
-| Extracting patches       | Update bounding box                 | 0               |
+| Extracting patches       | Update bounding box                 | 0.000           |
 |                          | Non-compressed descriptors          | 1.02            |
 |                          | Non-compressed custom descriptors   | 0.196           |
 |                          | Compressed descriptors              | 7.301           |
@@ -55,7 +55,7 @@ The table below gives the time (averaged over the number  taken by the baseline 
 |                          | Compress                            | 4.249           |
 |                          | Merge all features                  | 0.705           |
 |                          | _Total_                             | _25.118_        |
-| Least Squares Regression | Initialization                      | 0               |
+| Least Squares Regression | Initialization                      | 0.000           |
 |                          | Calculate alphas                    | 18.57           |
 |                          | Compute FFT                         | 1.758           |
 |                          | Add a small value                   | 0.378           |
@@ -74,36 +74,36 @@ Our first parallel implementation of `denseGaussKernel` gives the following resu
 
 | Phase                    | Subtask                             | Time taken (ms) |
 |--------------------------|-------------------------------------|-----------------|
-| Detection                | Extract and pre-process the patches | 1.066           |
-|                          | Non-compressed custom descriptors   | 0.197           |
-|                          | Compressed descriptors              | 6.227           |
-|                          | Compressed custom descriptors       | 2.721           |
-|                          | Compress features and KRSL          | 8.867           |
-|                          | Merge all features                  | 1.528           |
-|                          | Compute the gaussian kernel         | 13.963          |
-|                          | Compute the FFT                     | 1.762           |
-|                          | Calculate filter response           | 2.994           |
-|                          | Extract maximum response            | 0.224           |
-|                          | _Total_                             | _39.549_        |
-| Extracting patches       | Update bounding box                 | 0               |
-|                          | Non-compressed descriptors          | 0.979           |
-|                          | Non-compressed custom descriptors   | 0.194           |
-|                          | Compressed descriptors              | 6.12            |
-|                          | Compressed custom descriptors       | 3.071           |
-|                          | Update training data                | 3.013           |
-|                          | _Total_                             | _13.379_        |
-| Feature compression      | Update projection matrix            | 19.492          |
-|                          | Compress                            | 4.071           |
-|                          | Merge all features                  | 0.703           |
-|                          | _Total_                             | _24.266_        |
-| Least Squares Regression | Initialization                      | 0               |
-|                          | Calculate alphas                    | 17.38           |
-|                          | Compute FFT                         | 1.783           |
-|                          | Add a small value                   | 0.374           |
-|                          | New alphaf                          | 1.091           |
-|                          | Update RLS Model                    | 0.887           |
-|                          | _Total_                             | _21.515_        |
-| _Total time for a frame_ |                                     | _100.211_       |
+| Detection                | Extract and pre-process the patches | 1.091           |
+|                          | Non-compressed custom descriptors   | 0.209           |
+|                          | Compressed descriptors              | 7.047           |
+|                          | Compressed custom descriptors       | 2.854           |
+|                          | Compress features and KRSL          | 10.184          |
+|                          | Merge all features                  | 1.622           |
+|                          | **Compute the gaussian kernel**     | **12.527**      |
+|                          | Compute the FFT                     | 1.994           |
+|                          | Calculate filter response           | 3.319           |
+|                          | Extract maximum response            | 0.255           |
+|                          | _Total_                             | _41.102_        |
+| Extracting patches       | Update bounding box                 | 0.000           |
+|                          | Non-compressed descriptors          | 1.106           |
+|                          | Non-compressed custom descriptors   | 0.198           |
+|                          | Compressed descriptors              | 6.696           |
+|                          | Compressed custom descriptors       | 3.625           |
+|                          | Update training data                | 3.192           |
+|                          | _Total_                             | _14.817_        |
+| Feature compression      | Update projection matrix            | 21.556          |
+|                          | Compress                            | 4.571           |
+|                          | Merge all features                  | 0.724           |
+|                          | _Total_                             | _26.851_        |
+| Least Squares Regression | Initialization                      | 0.000           |
+|                          | Calculate alphas                    | 16.663          |
+|                          | Compute FFT                         | 1.968           |
+|                          | Add a small value                   | 0.414           |
+|                          | New alphaf                          | 1.194           |
+|                          | Update RLS Model                    | 0.963           |
+|                          | _Total_                             | _21.203_        |
+| _Total time for a frame_ |                                     | _105.560_       |
 
 We have found ways to improve the performance again (by pipelining the operations on GPU instead of transfering to/from the GPU after calling each function). These preliminary results should be updated in the next few hours/days.
 

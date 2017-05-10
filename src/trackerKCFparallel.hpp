@@ -79,7 +79,7 @@ namespace cv {
     void inline fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const;
     void inline fft2(const Mat src, Mat & dest) const;
     void inline ifft2(const Mat src, Mat & dest) const;
-    void inline cudafft2(const cuda::GpuMat src, std::vector<cuda::GpuMat> & dest, std::vector<cuda::GpuMat> & layers_data);
+    void inline cudafft2(int num_channels, std::vector<cuda::GpuMat> & dest, std::vector<cuda::GpuMat> & layers_data);
     void inline cudafft2(const Mat src, Mat & dest);
     void inline cudaifft2(const cuda::GpuMat src, cuda::GpuMat & dest);
     void inline full2cce(const Mat src, Mat & dest);
@@ -154,6 +154,13 @@ namespace cv {
     cuda::GpuMat ifft2_dest;
     cuda::GpuMat fft2_src;
     cuda::GpuMat fft2_dest;
+
+    cuda::GpuMat xyf_c_gpu;
+    cuda::GpuMat xyf_r_gpu;
+    std::vector<cuda::GpuMat> xf_data_gpu;
+    std::vector<cuda::GpuMat> yf_data_gpu;
+    std::vector<cuda::GpuMat> layers_data_gpu;
+    std::vector<cuda::GpuMat> xyf_v_gpu;
 
 
     #if TIME

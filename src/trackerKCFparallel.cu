@@ -565,9 +565,8 @@ namespace cv {
        }
      }
 
-     void inline TackerKCFImplParallel::cudafft2(const cuda::GpuMat src, std::vector<cuda::GpuMat> & dest, std::vector<cuda::GpuMat> & layers_data) {
-
-       for (int i = 0; i < src.channels(); i++) {
+     void inline TackerKCFImplParallel::cudafft2(int num_channels, std::vector<cuda::GpuMat> & dest, std::vector<cuda::GpuMat> & layers_data) {
+       for (int i = 0; i < num_channels; i++) {
          cuda::dft(layers_data[i], dest[i], layers_data[i].size(), DFT_DOUBLE);
        }
      }
@@ -585,9 +584,6 @@ namespace cv {
        src_cce = src;
        // The size correection is necessary to account for the CCE format
        cv::Size dest_size((src.size().width -1)*2,src.size().height);
-
-
-       cuda::createContinuous(dest_size, CV_64F, dest);
 
 
        cuda::dft(src_cce, dest, dest_size,
@@ -634,7 +630,6 @@ namespace cv {
       * Combines all channels in a multi-channels Mat data into a single channel
       */
      void inline TackerKCFImplParallel::sumChannels(std::vector<cuda::GpuMat> src, cuda::GpuMat & dest) const {
-       cuda::createContinuous(src[0].size(), src[0].type(), dest);
        src[0].copyTo(dest);
        for(unsigned i=1;i<src.size();i++){
          cuda::add(src[i],dest,dest);
@@ -804,15 +799,23 @@ namespace cv {
 
 
       // First we download all the data onto the Gpu
-      cuda::GpuMat x_data_gpu(x_data.size(),x_data.type());
-      x_data_gpu.upload(x_data);
-      cuda::GpuMat y_data_gpu(y_data.size(),y_data.type());
-      y_data_gpu.upload(y_data);
-      cuda::GpuMat xyf_gpu(xyf.size(),xyf.type());
-      std::vector<cuda::GpuMat> xf_data_gpu(x_data.channels());
-      std::vector<cuda::GpuMat> yf_data_gpu(x_data.channels());
-      std::vector<cuda::GpuMat> layers_data_gpu(x_data.channels());
-      std::vector<cuda::GpuMat> xyf_v_gpu(x_data.channels());
+
+      int num_channels = x_data.channels();
+      if (xf_data_gpu.empty()) {
+        Size complex_size(x_data.size().width/2+1, x_data.size().height);
+
+        cuda::createContinuous(complex_size, CV_64FC2, xyf_c_gpu);
+        cuda::createContinuous(x_data.size(), CV_64F, xyf_r_gpu);
+        xf_data_gpu.resize(num_channels);
+        yf_data_gpu.resize(num_channels);
+        layers_data_gpu.resize(num_channels);
+        xyf_v_gpu.resize(num_channels);
+        for (int i = 0; i < num_channels; i++){
+            cuda::createContinuous(x_data.size(), CV_64F, layers_data_gpu[i]);
+            cuda::createContinuous(complex_size, CV_64FC2, xf_data_gpu[i]);
+            cuda::createContinuous(complex_size, CV_64FC2, yf_data_gpu[i]);
+        }
+      }
 
 
        double normX = norm(x_data, NORM_L2SQR);
@@ -820,36 +823,31 @@ namespace cv {
 
        //std::cout << "====== Beginning gaussian kernel =======" << std::endl;
 
-       //std::cout << "Matrix size before fft: " << x_data_gpu.size() << std::endl;
+       //std::cout << "Matrix size before fft: " << x_data.size() << std::endl;
 
        split(x_data, layers_data);
        for (int i = 0; i < x_data.channels(); i++){
-           cuda::createContinuous(layers_data[i].size(), layers_data[i].type(), layers_data_gpu[i]);
-           cuda::createContinuous(Size(layers_data[i].size().width/2+1, layers_data[i].size().height), CV_64FC2, xf_data_gpu[i]);
            layers_data_gpu[i].upload(layers_data[i]);
        }
 
+       cudafft2(num_channels,xf_data_gpu,layers_data_gpu);
 
-       cudafft2(x_data_gpu,xf_data_gpu,layers_data_gpu);
-
-       split(x_data, layers_data);
+       split(y_data, layers_data);
        for (int i = 0; i < x_data.channels(); i++){
-           cuda::createContinuous(layers_data[i].size(), layers_data[i].type(), layers_data_gpu[i]);
-           cuda::createContinuous(Size(layers_data[i].size().width/2+1, layers_data[i].size().height), CV_64FC2, yf_data_gpu[i]);
            layers_data_gpu[i].upload(layers_data[i]);
        }
 
-       cudafft2(y_data_gpu,yf_data_gpu,layers_data_gpu);
+       cudafft2(y_data.channels(),yf_data_gpu,layers_data_gpu);
 
        //std::cout << "Matrix size after fft: " << yf_data_gpu[0].size() << std::endl;
 
        pixelWiseMult(xf_data_gpu,yf_data_gpu,xyf_v_gpu,0,true);
-       sumChannels(xyf_v_gpu,xyf_gpu);
-       cudaifft2(xyf_gpu,xyf_gpu);
+       sumChannels(xyf_v_gpu,xyf_c_gpu);
+       cudaifft2(xyf_c_gpu,xyf_r_gpu);
 
-       //std::cout << "Matrix size after ifft: " << xyf_gpu.size() << std::endl;
+       //std::cout << "Matrix size after ifft: " << xyf_r_gpu.size() << std::endl;
 
-       xyf_gpu.download(xyf);
+       xyf_r_gpu.download(xyf);
 
        if(params.wrap_kernel){
          shiftRows(xyf, x_data.rows/2);
