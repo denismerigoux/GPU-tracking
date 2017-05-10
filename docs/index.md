@@ -11,6 +11,22 @@ The main dependency is temporal: you need to examine the frames in order, each o
 
 The challenge is then to optimize the parallelization rate of the algorithm, find out the bottlenecks and try to overcome them The goal is to perform the computation in real time with the best framerate possible (with a decent resolution).
 
+## Correctness and performance analysis
+
+We have built a correctness and performance analysis engine, which shows performance per task (averaged over the number of frames) updated in real time, and stop if the parallel solution is not correct. We determine if the solution is correct by comparing the bounding boxes returned by the parallel implementation with those returned by the sequential implementation. They must be *exactly* the same (no approximation).
+
+Example of output for an incorrect implementation:
+```
+=== Sequential ===
+// Performance information for the 189 frames of the video, not shown here
+=== Parallel ===
+// Performance information for the first 4 frames of the video, not shown here
+Correctness failed at frame 3
+Bounding box mismatch:
+* Sequential: [286 x 720 from (635, 219)]
+* Parallel: [286 x 720 from (635, 221)]
+```
+
 ## Analyzing performance of the sequential implementation
 
 The table below gives the time (averaged over the number  taken by the baseline sequential algorithm for each subtask:
