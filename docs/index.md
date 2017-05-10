@@ -56,13 +56,13 @@ The table below gives the time (averaged over the number  taken by the baseline 
 |                          | Merge all features                  | 0.705           |
 |                          | _Total_                             | _25.118_        |
 | Least Squares Regression | Initialization                      | 0.000           |
-|                          | Calculate alphas                    | 18.57           |
+|                          | **Calculate alphas**                | **18.57**       |
 |                          | Compute FFT                         | 1.758           |
 |                          | Add a small value                   | 0.378           |
 |                          | New alphaf                          | 1.095           |
 |                          | Update RLS Model                    | 0.837           |
 |                          | _Total_                             | _22.638_        |
-| _Total time for a frame_ |                                     | _111.353_       |
+| **_Total time for a frame_** |                                 | **_111.353_**       |
 
 ## Preliminary results
 
@@ -103,7 +103,7 @@ Our first parallel implementation of `denseGaussKernel` gives the following resu
 |                          | New alphaf                          | 1.147           |
 |                          | Update RLS Model                    | 0.900           |
 |                          | _Total_                             | _19.401_        |
-| _Total time for a frame_ |                                     | _98.510_       |
+| **_Total time for a frame_** |                                 | **_98.510_**    |
 
 We have found ways to improve the performance again (by pipelining the operations on GPU instead of transfering to/from the GPU after calling each function). These preliminary results should be updated in the next few hours/days.
 
