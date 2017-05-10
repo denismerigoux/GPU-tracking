@@ -578,7 +578,7 @@ namespace cv {
          cuda::dft(fft2_src, fft2_dest, fft2_src.size(), DFT_DOUBLE);
 
          fft2_dest.download(dest[i]);
-         cce2full(dest[i],dest[i]);
+         //cce2full(dest[i],dest[i]);
        }
      }
 
@@ -593,16 +593,18 @@ namespace cv {
      void inline TackerKCFImplParallel::cudaifft2(const Mat src, Mat & dest) {
        Mat src_cce;
        src_cce = src;
-       full2cce(src, src_cce);
+       cv::Size dest_size((src.size().width -1)*2,src.size().height);
+       //full2cce(src, src_cce);
+
 
        if (ifft2_src.empty()) {
          cuda::createContinuous(src_cce.size(), src_cce.type(), ifft2_src);
-         cuda::createContinuous(src_cce.size(), CV_64F, ifft2_dest);
+         cuda::createContinuous(dest_size, CV_64F, ifft2_dest);
        }
 
        ifft2_src.upload(src_cce);
 
-       cuda::dft(ifft2_src, ifft2_dest, src.size(),
+       cuda::dft(ifft2_src, ifft2_dest, dest_size,
          (DFT_SCALE + DFT_REAL_OUTPUT) | DFT_INVERSE | DFT_DOUBLE);
 
        ifft2_dest.download(dest);
@@ -817,12 +819,20 @@ namespace cv {
        double normX = norm(x_data, NORM_L2SQR);
        double normY = norm(y_data, NORM_L2SQR);
 
+       //std::cout << "====== Beginning gaussian kernel =======" << std::endl;
+
+       //std::cout << "Matrix size before fft: " << x_data.size() << std::endl;
+
        cudafft2(x_data,xf_data,layers_data);
        cudafft2(y_data,yf_data,layers_data);
+
+       //std::cout << "Matrix size after fft: " << yf_data[0].size() << std::endl;
 
        pixelWiseMult(xf_data,yf_data,xyf_v,0,true);
        sumChannels(xyf_v,xyf);
        cudaifft2(xyf,xyf);
+
+       //std::cout << "Matrix size after ifft: " << xyf.size() << std::endl;
 
        if(params.wrap_kernel){
          shiftRows(xyf, x_data.rows/2);
@@ -843,6 +853,8 @@ namespace cv {
        double sig=-1.0/(sigma*sigma);
        xy=sig*xy;
        exp(xy, k_data);
+
+      //std::cout << "====== Ending gaussian kernel =======" << std::endl;
 
      }
 
