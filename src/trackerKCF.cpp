@@ -87,7 +87,7 @@ namespace cv {
       std::string step_label, std::string steps_details_label, double time) {
         file << "| " << step_label << " | " << mode << steps_details_label << \
           mode << " | " << mode << std::fixed << std::setprecision(3) << \
-          (1000. * time) / (frame - 1) << mode << " ms |\n";
+          (1000. * time) / (frame - 1) << " ms |\n" << mode;
     }
     #endif
 
