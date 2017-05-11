@@ -78,36 +78,36 @@ Our parallel implementation yield the following results:
 
 | Phase | Subtask | Time taken |
 |--------------------------|-------------------------------------|-----------------|
-| Detection | Extract and pre-process the patch | 1.049 ms |
-|  | Non-compressed custom descriptors | 0.207 ms |
-|  | **Compressed descriptors** | **3.129 ms** |
-|  | Compressed custom descritors | 2.887 ms |
-|  | Compress features and KRSL | 9.741 ms |
-|  | Merge all features | 1.618 ms |
-|  | **Compute the gaussian kernel** | **11.072 ms** |
-|  | Compute the FFT | 1.934 ms |
-|  | Calculate filter response | 3.248 ms |
-|  | Extract maximum response | 0.252 ms |
-|  | *Total* | *35.135 ms* |
+| Detection | Extract and pre-process the patch | 1.092 ms |
+|  | Non-compressed custom descriptors | 0.193 ms |
+|  | **Compressed descriptors** | **3.112 ms** |
+|  | Compressed custom descritors | 2.809 ms |
+|  | Compress features and KRSL | 8.910 ms |
+|  | Merge all features | 1.559 ms |
+|  | **Compute the gaussian kernel** | **10.724 ms** |
+|  | Compute the FFT | 1.833 ms |
+|  | Calculate filter response | 3.155 ms |
+|  | Extract maximum response | 0.237 ms |
+|  | *Total* | *33.623 ms* |
 | Extracting patches | Update bounding box | 0.000 ms |
-|  | Non-compressed descriptors | 1.001 ms |
-|  | Non-compressed custom descriptors | 0.198 ms |
-|  | **Compressed descriptors** | **3.125 ms** |
-|  | Compressed custom descriptors | 3.578 ms |
-|  | Update training data | 3.102 ms |
-|  | *Total* | *10.909 ms* |
-| Feature compression | **Update projection matrix** | **14.010 ms** |
-|  | Compress | 4.465 ms |
-|  | Merge all features | 0.719 ms |
-|  | *Total* | *17.932 ms* |
+|  | Non-compressed descriptors | 1.005 ms |
+|  | Non-compressed custom descriptors | 0.193 ms |
+|  | **Compressed descriptors** | **3.106 ms** |
+|  | Compressed custom descriptors | 3.500 ms |
+|  | Update training data | 2.970 ms |
+|  | *Total* | *10.686 ms* |
+| Feature compression | **Update projection matrix** | **13.403 ms** |
+|  | Compress | 4.280 ms |
+|  | Merge all features | 0.712 ms |
+|  | *Total* | *17.382 ms* |
 | Least Squares Regression | Initialization | 0.000 ms |
-|  | **Calculate alphas** | **12.068 ms** |
-|  | Compute FFT | 1.924 ms |
-|  | Add a small value | 0.400 ms |
-|  | New Alphaf | 1.168 ms |
-|  | Update RLS model | 0.864 ms |
-|  | *Total* | *15.034 ms* |
-| ***Total time for a frame*** | | ***80.548 ms*** |
+|  | **Calculate alphas** | **11.783 ms** |
+|  | Compute FFT | 1.841 ms |
+|  | Add a small value | 0.398 ms |
+|  | New Alphaf | 1.140 ms |
+|  | Update RLS model | 0.847 ms |
+|  | *Total* | *14.633 ms* |
+| Total time for a frame | ****** | ***77.848 ms*** |
 
 Speedup: **x1.42**. We can track object at a rate of **12.4 frames per second** in FullHD using a NVIDIA GeForce GTX 1080, versus 8.7 frames per second with the sequential version.
 

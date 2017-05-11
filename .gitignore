@@ -13,3 +13,4 @@ tests/*
 main
 build
 checkpoint/checkpoint.pdf
+results/
