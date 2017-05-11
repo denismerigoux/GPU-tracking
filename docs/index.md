@@ -109,7 +109,7 @@ Our parallel implementation yield the following results:
 |  | *Total* | *15.034 ms* |
 | Total time for a frame | ****** | ***80.548 ms*** |
 
-Speedup: **x1.42**.
+Speedup: **x1.42**. We can track object at a rate of ***12.4 frames per second*** in FullHD using a NVIDIA GeForce GTX 1080, versus 8.7 frames per second with the sequential version.
 
 ## Ressources
 
