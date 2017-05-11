@@ -35,7 +35,7 @@ The table below gives the time, averaged over the number of frames after the fir
 |--------------------------|-------------------------------------|-----------------|
 | Detection | Extract and pre-process the patch | 1.028 ms |
 |  | Non-compressed custom descriptors | 0.204 ms |
-|  | Compressed descriptors | 7.796 ms |
+|  | **Compressed descriptors** | **7.796 ms** |
 |  | Compressed custom descritors | 2.821 ms |
 |  | Compress features and KRSL | 9.986 ms |
 |  | Merge all features | 1.595 ms |
@@ -47,7 +47,7 @@ The table below gives the time, averaged over the number of frames after the fir
 | Extracting patches | Update bounding box | 0.000 ms |
 |  | Non-compressed descriptors | 1.023 ms |
 |  | Non-compressed custom descriptors | 0.199 ms |
-|  | Compressed descriptors | 7.397 ms |
+|  | **Compressed descriptors** | **7.397 ms** |
 |  | Compressed custom descriptors | 3.009 ms |
 |  | Update training data | 3.153 ms |
 |  | *Total* | *14.666 ms* |
@@ -62,7 +62,7 @@ The table below gives the time, averaged over the number of frames after the fir
 |  | New Alphaf | 1.135 ms |
 |  | Update RLS model | 0.923 ms |
 |  | *Total* | *23.115 ms* |
-|  | ***Total time for a frame*** | ***114.811 ms*** |
+| ***Total time for a frame*** | | ***114.811 ms*** |
 
 ## Preliminary results
 
@@ -107,7 +107,7 @@ Our parallel implementation yield the following results:
 |  | New Alphaf | 1.168 ms |
 |  | Update RLS model | 0.864 ms |
 |  | *Total* | *15.034 ms* |
-| Total time for a frame | ****** | ***80.548 ms*** |
+| ***Total time for a frame*** | | ***80.548 ms*** |
 
 Speedup: **x1.42**. We can track object at a rate of **12.4 frames per second** in FullHD using a NVIDIA GeForce GTX 1080, versus 8.7 frames per second with the sequential version.
 
