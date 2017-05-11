@@ -62,7 +62,7 @@ The table below gives the time, averaged over the number of frames after the fir
 |  | New Alphaf | 1.143 ms |
 |  | Update RLS model | 0.873 ms |
 |  | *Total* | *22.924 ms* |
-|  | ***Total time for a frame*** | ***114.023 ms*** |
+| ***Total time for a frame*** | | ***114.023 ms*** |
 
 ## Preliminary results
 
@@ -105,7 +105,7 @@ Our parallel implementation yield the following results:
 |  | New Alphaf | 1.167 ms |
 |  | Update RLS model | 0.922 ms |
 |  | *Total* | *14.881 ms* |
-|  | ***Total time for a frame*** | ***86.017 ms*** |
+| ***Total time for a frame*** | | ***86.017 ms*** |
 
 ## Ressources
 

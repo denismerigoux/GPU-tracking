@@ -29,4 +29,4 @@
 |  | New Alphaf | 1.167 ms |
 |  | Update RLS model | 0.922 ms |
 |  | *Total* | *14.881 ms* |
-|  | ***Total time for a frame*** | ***86.017 ms*** |
+| ***Total time for a frame*** | | ***86.017 ms*** |

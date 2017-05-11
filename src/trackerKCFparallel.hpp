@@ -92,7 +92,7 @@ namespace cv {
             }
             write_line(file, "*", frame, "", "Total", cumulated_times[i]);
         }
-        write_line(file, "***", frame, "", "Total time for a frame", cumulated_times[num_steps-1]);
+        write_line(file, "***", frame, "Total time for a frame", "", cumulated_times[num_steps-1]);
         file.close();
       #endif
     }
