@@ -29,40 +29,40 @@ Bounding box mismatch:
 
 ## Analyzing performance of the sequential implementation
 
-The table below gives the time (averaged over the number  taken by the baseline sequential algorithm for each subtask:
+The table below gives the time, averaged over the number of frames after the first frame (which serves as initialization), taken by the baseline sequential algorithm for each subtask:
 
 | Phase                    | Subtask                             | Time taken (ms) |
 |--------------------------|-------------------------------------|-----------------|
-| Detection                | Extract and pre-process the patches | 1.055           |
-|                          | Non-compressed custom descriptors   | 0.193           |
-|                          | Compressed descriptors              | 7.355           |
-|                          | Compressed custom descriptors       | 2.774           |
-|                          | Compress features and KRSL          | 9.372           |
-|                          | Merge all features                  | 1.558           |
-|                          | **Compute the gaussian kernel**     | **20.087**      |
-|                          | Compute the FFT                     | 1.748           |
-|                          | Calculate filter response           | 3.101           |
-|                          | Extract maximum response            | 0.236           |
-|                          | _Total_                             | _47.48_         |
+| Detection                | Extract and pre-process the patches | 1.083           |
+|                          | Non-compressed custom descriptors   | 0.198           |
+|                          | Compressed descriptors              | 7.408           |
+|                          | Compressed custom descriptors       | 2.800           |
+|                          | Compress features and KRSL          | 9.707           |
+|                          | Merge all features                  | 1.569           |
+|                          | **Compute the gaussian kernel**     | **20.637**      |
+|                          | Compute the FFT                     | 1.775           |
+|                          | Calculate filter response           | 3.109           |
+|                          | Extract maximum response            | 0.238           |
+|                          | _Total_                             | _48.524_        |
 | Extracting patches       | Update bounding box                 | 0.000           |
-|                          | Non-compressed descriptors          | 1.02            |
-|                          | Non-compressed custom descriptors   | 0.196           |
-|                          | Compressed descriptors              | 7.301           |
-|                          | Compressed custom descriptors       | 3.058           |
-|                          | Update training data                | 3.027           |
-|                          | _Total_                             | _14.602_        |
-| Feature compression      | Update projection matrix            | 20.164          |
-|                          | Compress                            | 4.249           |
-|                          | Merge all features                  | 0.705           |
-|                          | _Total_                             | _25.118_        |
+|                          | Non-compressed descriptors          | 1.010           |
+|                          | Non-compressed custom descriptors   | 0.198           |
+|                          | Compressed descriptors              | 7.353           |
+|                          | Compressed custom descriptors       | 3.147           |
+|                          | Update training data                | 3.119           |
+|                          | _Total_                             | _14.703_        |
+| Feature compression      | **Update projection matrix**        | **20.746**      |
+|                          | Compress                            | 4.315           |
+|                          | Merge all features                  | 0.714           |
+|                          | _Total_                             | _25.578_        |
 | Least Squares Regression | Initialization                      | 0.000           |
-|                          | **Calculate alphas**                | **18.57**       |
-|                          | Compute FFT                         | 1.758           |
-|                          | Add a small value                   | 0.378           |
-|                          | New alphaf                          | 1.095           |
-|                          | Update RLS Model                    | 0.837           |
-|                          | _Total_                             | _22.638_        |
-| **_Total time for a frame_** |                                 | **_111.353_**       |
+|                          | **Calculate alphas**                | **18.884**      |
+|                          | Compute FFT                         | 1.782           |
+|                          | Add a small value                   | 0.384           |
+|                          | New alphaf                          | 1.139           |
+|                          | Update RLS Model                    | 0.926           |
+|                          | _Total_                             | _22.927_        |
+| **_Total time for a frame_** |                                 | **_113.279_**   |
 
 ## Preliminary results
 
@@ -70,42 +70,42 @@ Given the timing results on the sequential algorithm, we have decided to start i
 
 This function uses calls to [Fast Fourier Transform](https://en.wikipedia.org/wiki/Fast_Fourier_transform) and inverse FFT, therefore we have decided to use [the NVIDIA CUDA Fast Fourier Transform library (cuFFT)](https://developer.nvidia.com/cufft).
 
-Our first parallel implementation of `denseGaussKernel` gives the following results:
+We have also implemented a parallel version of `updateProjectionMatrix`, which involves a very large matrix multiplication.
 
-| Phase                    | Subtask                             | Time taken (ms) |
+Our parallel implementation yield the following results:
+
+| Phase | Subtask | Time taken |
 |--------------------------|-------------------------------------|-----------------|
-| Detection                | Extract and pre-process the patches | 1.037           |
-|                          | Non-compressed custom descriptors   | 0.200           |
-|                          | Compressed descriptors              | 6.613           |
-|                          | Compressed custom descriptors       | 2.827           |
-|                          | Compress features and KRSL          | 9.273           |
-|                          | Merge all features                  | 1.570           |
-|                          | **Compute the gaussian kernel**     | **10.809**      |
-|                          | Compute the FFT                     | 1.881           |
-|                          | Calculate filter response           | 3.167           |
-|                          | Extract maximum response            | 0.240           |
-|                          | _Total_                             | _37.617_        |
-| Extracting patches       | Update bounding box                 | 0.000           |
-|                          | Non-compressed descriptors          | 1.008           |
-|                          | Non-compressed custom descriptors   | 0.197           |
-|                          | Compressed descriptors              | 6.492           |
-|                          | Compressed custom descriptors       | 3.487           |
-|                          | Update training data                | 3.082           |
-|                          | _Total_                             | _14.266_        |
-| Feature compression      | Update projection matrix            | 20.618          |
-|                          | Compress                            | 4.337           |
-|                          | Merge all features                  | 0.708           |
-|                          | _Total_                             | _25.663_        |
-| Least Squares Regression | Initialization                      | 0.000           |
-|                          | **Calculate alphas**                | **16.663**      |
-|                          | Compute FFT                         | 1.886           |
-|                          | Add a small value                   | 0.403           |
-|                          | New alphaf                          | 1.147           |
-|                          | Update RLS Model                    | 0.900           |
-|                          | _Total_                             | _19.401_        |
-| **_Total time for a frame_** |                                 | **_98.510_**    |
-
-We have found ways to improve the performance again (by pipelining the operations on GPU instead of transfering to/from the GPU after calling each function). These preliminary results should be updated in the next few hours/days.
+| Detection | Extract and pre-process the patch | 1.135 ms |
+|  | Non-compressed custom descriptors | 0.204 ms |
+|  | Compressed descriptors | 6.620 ms |
+|  | Compressed custom descritors | 2.826 ms |
+|  | Compress features and KRSL | 9.216 ms |
+|  | Merge all features | 1.593 ms |
+|  | **Compute the gaussian kernel** | **10.899** ms |
+|  | Compute the FFT | 1.864 ms |
+|  | Calculate filter response | 3.155 ms |
+|  | Extract maximum response | 0.240 ms |
+|  | *Total* | *37.751* ms |
+| Extracting patches | Update bounding box | 0.000 ms |
+|  | Non-compressed descriptors | 1.013 ms |
+|  | Non-compressed custom descriptors | 0.196 ms |
+|  | Compressed descriptors | 6.392 ms |
+|  | Compressed custom descriptors | 3.468 ms |
+|  | Update training data | 3.047 ms |
+|  | *Total* | *14.017* ms |
+| Feature compression | **Update projection matrix** | **14.028** ms |
+|  | Compress | 4.345 ms |
+|  | Merge all features | 0.717 ms |
+|  | *Total* | *17.827* ms |
+| Least Squares Regression | Initialization | 0.000 ms |
+|  | **Calculate alphas** | **11.926** ms |
+|  | Compute FFT | 1.872 ms |
+|  | Add a small value | 0.412 ms |
+|  | New Alphaf | 1.167 ms |
+|  | Update RLS model | 0.922 ms |
+|  | *Total* | *14.881* ms |
+|  | ***Total time for a frame*** | ***86.017*** ms |
 
 ## Ressources
 

@@ -12,7 +12,8 @@ inline bool compare_bounding_boxes(const Rect2d &bbox1, const Rect2d &bbox2) {
         && bbox1.br().y == bbox2.br().y;
 }
 
-void track(bool parallel, VideoCapture &video, Rect2d bbox, bool display, Rect2d *bounding_boxes, bool check_correctness, int num_frames) {
+void track(bool parallel, VideoCapture &video, Rect2d bbox, bool display,
+  Rect2d *bounding_boxes, bool check_correctness, int num_frames) {
     if (parallel) {
         cout << "=== Parallel ===" << endl;
     }
@@ -113,7 +114,7 @@ int main(int argc, char **argv)
 
     // bbox = selectROI(frame, false);
 
-    test_implementation(false, true, video, bbox, false, 10);
+    test_implementation(true, true, video, bbox, false, -1);
 
     return 0;
 

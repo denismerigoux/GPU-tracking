@@ -46,6 +46,7 @@
 
 #if TIME
 #include <iomanip>
+#include <fstream>
 #endif
 
 /*---------------------------
@@ -80,6 +81,39 @@ namespace cv {
     void read( const FileNode& /*fn*/ );
     void write( FileStorage& /*fs*/ ) const;
     void setFeatureExtractor(void (*f)(const Mat, const Rect, Mat&), bool pca_func = false);
+
+    #if TIME == 2
+    inline void write_line(std::ofstream &file, std::string mode, int frame,
+      std::string step_label, std::string steps_details_label, double time) {
+        file << "| " << step_label << " | " << mode << steps_details_label << \
+          mode << " | " << mode << std::fixed << std::setprecision(3) << \
+          (1000. * time) / (frame - 1) << mode << " ms |\n";
+    }
+    #endif
+
+    ~TackerKCFImplSequential() {
+      #if TIME == 2
+      std::string path = "results/sequential.md";
+        std::ofstream file(path);
+        file << "| Phase | Subtask | Time taken |\n";
+        file << "|--------------------------|-------------------------------------|-----------------|\n";
+        for (int i = 0; i < num_steps-1; i++) {
+            for (int j = 0; j < num_steps_details[i]; j++) {
+                std::string mode = "";
+                if (i == 0 && j == 6 || // Compute the gaussian kernel
+                    i == 2 && j == 0 || // Update projection matrix
+                    i == 3 && j == 1) { // Calculate alphas
+                    mode = "**";
+                }
+                write_line(file, mode, frame, (j==0) ? steps_labels[i]: "",
+                  steps_details_labels[i][j], cumulated_details_times[i][j]);
+            }
+            write_line(file, "*", frame, "", "Total", cumulated_times[i]);
+        }
+        write_line(file, "***", frame, "", "Total time for a frame", cumulated_times[num_steps-1]);
+        file.close();
+      #endif
+    }
 
   protected:
      /*
@@ -188,19 +222,26 @@ namespace cv {
         printTime(endTime - startTime, "", "Initialization");
     }
     void updateTime(double startTime, int step) {
-        double endTime = CycleTimer::currentSeconds();
-        cumulated_times[step] += endTime - startTime;
+        if (frame != 0 || step == num_steps-1) {
+          double endTime = CycleTimer::currentSeconds();
+          cumulated_times[step] += endTime - startTime;
+        }
     }
 
     void printAverageTimes() {
-        if (frame != 1) {
+        if (frame == 0) {
+          printTime(cumulated_times[num_steps-1], "", "Time for the first frame");
+          cumulated_times[num_steps-1] = 0;
+          return;
+        }
+        if (frame > 1) {
             // Clear previous times
             for (int i = 0; i < total_lines; i++) {
                 printf("\e[A");
             }
         }
         char buffer[45];
-        sprintf(buffer, "Average time for the first %d frames", frame);
+        sprintf(buffer, "Average time for the next %d frames", frame);
         printTime(cumulated_times[num_steps-1] / frame, "", buffer);
         for (int i = 0; i < num_steps-1; i++) {
             printTime(cumulated_times[i] / frame, "--> ",
@@ -244,10 +285,10 @@ namespace cv {
          // Least Squares
          {"Initialization",
           "Calculate alphas",
-          "Non-compressed custom descriptors",
-          "Compressed descriptors",
-          "Compressed custom descriptors",
-          "Update training data"}};
+          "Compute FFT",
+          "Add a small value",
+          "New Alphaf",
+          "Update RLS model"}};
     double cumulated_details_times[num_steps-1][max_num_details];
 
     void updateTimeDetail(double *startTime, int step, int step_detail) {
@@ -708,12 +749,13 @@ namespace cv {
     updateTimeDetail(&startLeastSquaresDetail, 3, 5);
     #endif
 
-    frame++;
     #if TIME
     updateTime(startLeastSquares, 3);
     updateTime(startUpdate, 4);
     printAverageTimes();
     #endif
+
+    frame++;
 
     return true;
   }

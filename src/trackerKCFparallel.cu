@@ -164,6 +164,26 @@ namespace cv {
          || use_custom_extractor_npca
        );
 
+       // Initialize pca_data_gpu GpuMat
+       cuda::createContinuous(roi.size(), CV_64F, pca_data_gpu);
+
+       // Initialize GpuMats
+       Size complex_size(roi.size().width/2+1, roi.size().height);
+
+       int num_channels = image.channels();
+
+       cuda::createContinuous(complex_size, CV_64FC2, xyf_c_gpu);
+       cuda::createContinuous(roi.size(), CV_64F, xyf_r_gpu);
+       xf_data_gpu.resize(num_channels);
+       yf_data_gpu.resize(num_channels);
+       layers_data_gpu.resize(num_channels);
+       xyf_v_gpu.resize(num_channels);
+       for (int i = 0; i < num_channels; i++){
+           cuda::createContinuous(roi.size(), CV_64F, layers_data_gpu[i]);
+           cuda::createContinuous(complex_size, CV_64FC2, xf_data_gpu[i]);
+           cuda::createContinuous(complex_size, CV_64FC2, yf_data_gpu[i]);
+       }
+
        #if TIME
        printInitializationTime(startInit);
        #endif
@@ -497,12 +517,13 @@ namespace cv {
        updateTimeDetail(&startLeastSquaresDetail, 3, 5);
        #endif
 
-       frame++;
        #if TIME
        updateTime(startLeastSquares, 3);
        updateTime(startUpdate, 4);
        printAverageTimes();
        #endif
+
+       frame++;
 
        return true;
      }
@@ -636,12 +657,15 @@ namespace cv {
        }
      }
 
+
+     //void inline
+
      /*
       * obtains the projection matrix using PCA
       */
      void inline TackerKCFImplParallel::updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix, double pca_rate, int compressed_sz,
-                                                        std::vector<Mat> & layers_pca,std::vector<Scalar> & average, Mat pca_data, Mat new_cov, Mat w, Mat u, Mat vt) const {
-
+                                                        std::vector<Mat> & layers_pca,std::vector<Scalar> & average, Mat pca_data, Mat new_cov, Mat w, Mat u, Mat vt) {
+       GpuMat new_cov_gpu;
 
        double start = CycleTimer::currentSeconds();
 
@@ -654,27 +678,21 @@ namespace cv {
          layers_pca[i]-=average[i];
        }
 
-       double middle3 = CycleTimer::currentSeconds();
-       printTime(middle3 - start, "", "Before covariance");
-
        // calc covariance matrix
        merge(layers_pca,pca_data);
        pca_data=pca_data.reshape(1,src.rows*src.cols);
 
-       double middle4 = CycleTimer::currentSeconds();
-       printTime(middle4 - middle3, "", "Covariance matrix part 1");
+       pca_data_gpu.upload(pca_data);
 
-       new_cov=1.0/(double)(src.rows*src.cols-1)*(pca_data.t()*pca_data);
+       GpuMat src3;
+       cuda::gemm(pca_data_gpu, pca_data_gpu, 1.0/(double)(src.rows*src.cols-1),
+         src3, 0, new_cov_gpu, GEMM_1_T);
+       new_cov_gpu.download(new_cov);
+
        if(old_cov.rows==0)old_cov=new_cov.clone();
-
-       double middle = CycleTimer::currentSeconds();
-       printTime(middle - middle4, "", "Covariance matrix part 2");
 
        // calc PCA
        SVD::compute((1.0-pca_rate)*old_cov+pca_rate*new_cov, w, u, vt);
-
-       double middle1 = CycleTimer::currentSeconds();
-       printTime(middle1 - middle, "", "SVD");
 
        // extract the projection matrix
        proj_matrix=u(Rect(0,0,compressed_sz,src.channels())).clone();
@@ -685,10 +703,6 @@ namespace cv {
 
        // update the covariance matrix
        old_cov=(1.0-pca_rate)*old_cov+pca_rate*proj_matrix*proj_vars*proj_matrix.t();
-
-       double end = CycleTimer::currentSeconds();
-       printTime(end - middle1, "", "After SVD");
-       std::cout << std::endl;
      }
 
      /*
@@ -820,22 +834,6 @@ namespace cv {
       // First we download all the data onto the Gpu
 
       int num_channels = x_data.channels();
-      if (xf_data_gpu.empty()) {
-        Size complex_size(x_data.size().width/2+1, x_data.size().height);
-
-        cuda::createContinuous(complex_size, CV_64FC2, xyf_c_gpu);
-        cuda::createContinuous(x_data.size(), CV_64F, xyf_r_gpu);
-        xf_data_gpu.resize(num_channels);
-        yf_data_gpu.resize(num_channels);
-        layers_data_gpu.resize(num_channels);
-        xyf_v_gpu.resize(num_channels);
-        for (int i = 0; i < num_channels; i++){
-            cuda::createContinuous(x_data.size(), CV_64F, layers_data_gpu[i]);
-            cuda::createContinuous(complex_size, CV_64FC2, xf_data_gpu[i]);
-            cuda::createContinuous(complex_size, CV_64FC2, yf_data_gpu[i]);
-        }
-      }
-
 
        double normX = norm(x_data, NORM_L2SQR);
        double normY = norm(y_data, NORM_L2SQR);
@@ -848,7 +846,7 @@ namespace cv {
        }
        stream.waitForCompletion();
 
-       cudafft2(num_channels,xf_data_gpu,layers_data_gpu);
+       cudafft2(x_data.channels(),xf_data_gpu,layers_data_gpu);
 
        split(y_data, layers_data);
        for (int i = 0; i < x_data.channels(); i++){
@@ -887,8 +885,6 @@ namespace cv {
        double sig=-1.0/(sigma*sigma);
        xy=sig*xy;
        exp(xy, k_data);
-
-      //std::cout << "====== Ending gaussian kernel =======" << std::endl;
 
      }
 
