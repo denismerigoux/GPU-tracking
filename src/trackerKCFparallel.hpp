@@ -69,7 +69,7 @@ namespace cv {
       std::string step_label, std::string steps_details_label, double time) {
         file << "| " << step_label << " | " << mode << steps_details_label << \
           mode << " | " << mode << std::fixed << std::setprecision(3) << \
-          (1000. * time) / (frame - 1) << " ms |\n" << mode;
+          (1000. * time) / (frame - 1) << " ms" << mode << " |\n";
     }
     #endif
 
@@ -82,7 +82,9 @@ namespace cv {
         for (int i = 0; i < num_steps-1; i++) {
             for (int j = 0; j < num_steps_details[i]; j++) {
                 std::string mode = "";
-                if (i == 0 && j == 6 || // Compute the gaussian kernel
+                if (i == 0 && j == 2 || // Compressed descriptors
+                    i == 0 && j == 6 || // Compute the gaussian kernel
+                    i == 1 && j == 3 || // Compressed descriptors
                     i == 2 && j == 0 || // Update projection matrix
                     i == 3 && j == 1) { // Calculate alphas
                     mode = "**";
@@ -123,9 +125,9 @@ namespace cv {
     void inline updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix,double pca_rate, int compressed_sz,
                                        std::vector<Mat> & layers_pca,std::vector<Scalar> & average, Mat pca_data, Mat new_cov, Mat w, Mat u, Mat v);
     void inline compress(const Mat proj_matrix, const Mat src, Mat & dest, Mat & data, Mat & compressed) const;
-    bool getSubWindow(const Mat img, const Rect roi, Mat& feat, Mat& patch, TrackerKCF::MODE desc = GRAY) const;
+    bool getSubWindow(const Mat img, const Rect roi, Mat& feat, Mat& patch, TrackerKCF::MODE desc = GRAY);
     bool getSubWindow(const Mat img, const Rect roi, Mat& feat, void (*f)(const Mat, const Rect, Mat& )) const;
-    void extractCN(Mat patch_data, Mat & cnFeatures) const;
+    void extractCN(Mat patch_data, Mat & cnFeatures);
     void denseGaussKernel(const double sigma, const Mat , const Mat y_data, Mat & k_data,
                           std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf );
     void calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data);
@@ -193,6 +195,14 @@ namespace cv {
 
     //GpuMat for projection matrix
     cuda::GpuMat pca_data_gpu;
+
+    //GpuMats for ExtractCN
+    cuda::GpuMat patch_data_gpu;
+    cuda::GpuMat indexes_gpu;
+    cuda::GpuMat hann_cn_gpu;
+
+    //Cuda array for ColorNames
+    double *ColorNames_gpu;
 
 
     #if TIME

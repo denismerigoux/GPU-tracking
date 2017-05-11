@@ -93,6 +93,8 @@ void test_implementation(bool sequential, bool parallel, VideoCapture &video, Re
         track(true, video, bbox, display, bounding_boxes, true, num_frames); // Parallel
     }
     else {
+        std::cout << "WARNING: " << (parallel ? "Parallel" : "Sequential")
+          << "mode only. Correctness will not be checked." << std::endl;
         track(parallel, video, bbox, display, NULL, false, num_frames); // Sequential
     }
 }

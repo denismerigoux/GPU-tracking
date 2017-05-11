@@ -3,7 +3,7 @@
 #include "dft.cu"
 #include "mulspectrums.cu"
 
-#define returnFromUpdate() {fprintf(stderr, "Error in %s line %d while updating frame %d\n", __FILE__, __LINE__, frame); return false;}
+#define returnFromUpdate() {fprintf(stderr, "Error in %s line %d while updating frame %d\n", __FILE__, __LINE__, frame);}
 
 /*---------------------------
 |  TrackerKCFModel
@@ -164,14 +164,17 @@ namespace cv {
          || use_custom_extractor_npca
        );
 
+       // Initialize ExtractCN GpuMats
+       cuda::createContinuous(roi.size(), CV_8UC3, patch_data_gpu);
+       cuda::createContinuous(roi.size(), CV_16U, indexes_gpu);
+       hann_cn_gpu.upload(hann_cn);
+
        // Initialize pca_data_gpu GpuMat
        cuda::createContinuous(roi.size(), CV_64F, pca_data_gpu);
 
-       // Initialize GpuMats
+       // Initialize fft2 GpuMats
        Size complex_size(roi.size().width/2+1, roi.size().height);
-
        int num_channels = image.channels();
-
        cuda::createContinuous(complex_size, CV_64FC2, xyf_c_gpu);
        cuda::createContinuous(roi.size(), CV_64F, xyf_r_gpu);
        xf_data_gpu.resize(num_channels);
@@ -183,6 +186,11 @@ namespace cv {
            cuda::createContinuous(complex_size, CV_64FC2, xf_data_gpu[i]);
            cuda::createContinuous(complex_size, CV_64FC2, yf_data_gpu[i]);
        }
+
+       // Initialize ColorNames
+       size_t ColorNames_size = 32768 * 10 * sizeof(double); //2^15 * 10
+       cudaSafeCall(cudaMalloc((void**) &ColorNames_gpu, ColorNames_size));
+       cudaSafeCall(cudaMemcpy(ColorNames_gpu, ColorNames, ColorNames_size, cudaMemcpyHostToDevice));
 
        #if TIME
        printInitializationTime(startInit);
@@ -239,6 +247,7 @@ namespace cv {
          #if TIME == 2
          updateTimeDetail(&startDetectionDetail, 0, 1);
          #endif
+
 
          // get compressed descriptors
          for(unsigned i=0;i<descriptors_pca.size()-extractor_pca.size();i++){
@@ -717,7 +726,7 @@ namespace cv {
      /*
       * obtain the patch and apply hann window filter to it
       */
-     bool TackerKCFImplParallel::getSubWindow(const Mat img, const Rect _roi, Mat& feat, Mat& patch, TrackerKCF::MODE desc) const {
+     bool TackerKCFImplParallel::getSubWindow(const Mat img, const Rect _roi, Mat& feat, Mat& patch, TrackerKCF::MODE desc) {
 
        Rect region=_roi;
 
@@ -753,7 +762,7 @@ namespace cv {
          case CN:
            CV_Assert(img.channels() == 3);
            extractCN(patch,feat);
-           feat=feat.mul(hann_cn); // hann window filter
+           //feat=feat.mul(hann_cn); // hann window filter
            break;
          default: // GRAY
            if(img.channels()>1)
@@ -802,27 +811,69 @@ namespace cv {
        return true;
      }
 
+     __global__ void extractIndexKernel(const cuda::PtrStepSz<uchar3> input,
+       cuda::PtrStep<ushort> output) {
+        int x = blockIdx.x * blockDim.x + threadIdx.x;
+        int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+        if (x >= 0 && x < input.cols && y >= 0 && y < input.rows) {
+          uchar3 pixel = input(y,x);
+          output.ptr(y)[x] = (floor((float)pixel.z/8)+32*floor((float)pixel.y/8)+32*32*floor((float)pixel.x/8));
+        }
+    }
+
+    __global__ void extractCNKernel(const cuda::PtrStepSz<ushort> input,
+      cuda::PtrStep<double[10]> output, const double *ColorNames) {
+       int x = blockIdx.x * blockDim.x + threadIdx.x;
+       int y = blockIdx.y * blockDim.y + threadIdx.y;
+       int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+
+       if (x >= 0 && x < input.cols && y >= 0 && y < input.rows && k >= 0
+         && k < 10) {
+         short index = input(y,x);
+         output.ptr(y)[x][k] = ColorNames[10*index + k];
+         //output.ptr(y)[x] = (floor((float)pixel.z/8)+32*floor((float)pixel.y/8)+32*32*floor((float)pixel.x/8));
+       }
+   }
+
      /* Convert BGR to ColorNames
       */
-     void TackerKCFImplParallel::extractCN(Mat patch_data, Mat & cnFeatures) const {
-       Vec3b & pixel = patch_data.at<Vec3b>(0,0);
-       unsigned index;
-
-       if(cnFeatures.type() != CV_64FC(10))
+     void TackerKCFImplParallel::extractCN(Mat patch_data, Mat & cnFeatures) {
+       if(cnFeatures.type() != CV_64FC(10)) {
          cnFeatures = Mat::zeros(patch_data.rows,patch_data.cols,CV_64FC(10));
-
-       for(int i=0;i<patch_data.rows;i++){
-         for(int j=0;j<patch_data.cols;j++){
-           pixel=patch_data.at<Vec3b>(i,j);
-           index=(unsigned)(floor((float)pixel[2]/8)+32*floor((float)pixel[1]/8)+32*32*floor((float)pixel[0]/8));
-
-           //copy the values
-           for(int _k=0;_k<10;_k++){
-             cnFeatures.at<Vec<double,10> >(i,j)[_k]=ColorNames[index][_k];
-           }
-         }
        }
 
+       patch_data_gpu.upload(patch_data);
+
+       dim3 cthreads2d(32, 32);
+       dim3 cblocks2d(
+         static_cast<int>(std::ceil(patch_data_gpu.size().width /
+           static_cast<double>(cthreads2d.x))),
+         static_cast<int>(std::ceil(patch_data_gpu.size().height /
+           static_cast<double>(cthreads2d.y))));
+
+       extractIndexKernel<<<cblocks2d, cthreads2d>>>(patch_data_gpu, indexes_gpu);
+       cudaSafeCall(cudaGetLastError());
+
+       cuda::GpuMat cnFeatures_gpu;
+       cuda::createContinuous(patch_data.size(), CV_64FC(10), cnFeatures_gpu);
+
+       dim3 cthreads3d(32, 32, 1);
+       dim3 cblocks3d(
+         static_cast<int>(std::ceil(patch_data_gpu.size().width /
+           static_cast<double>(cthreads3d.x))),
+         static_cast<int>(std::ceil(patch_data_gpu.size().height /
+           static_cast<double>(cthreads3d.y))),
+         static_cast<int>(std::ceil(10 /
+           static_cast<double>(cthreads3d.z))));
+
+       extractCNKernel<<<cblocks3d, cthreads3d>>>(indexes_gpu, cnFeatures_gpu, ColorNames_gpu);
+       cudaSafeCall(cudaGetLastError());
+
+       cuda::multiply(cnFeatures_gpu, hann_cn_gpu, cnFeatures_gpu);
+
+       cnFeatures_gpu.download(cnFeatures);
      }
 
      /*
