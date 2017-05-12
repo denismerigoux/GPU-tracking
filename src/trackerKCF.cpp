@@ -100,7 +100,9 @@ namespace cv {
         for (int i = 0; i < num_steps-1; i++) {
             for (int j = 0; j < num_steps_details[i]; j++) {
                 std::string mode = "";
-                if (i == 0 && j == 6 || // Compute the gaussian kernel
+                if (i == 0 && j == 2 || // Compressed descriptors
+                    i == 0 && j == 6 || // Compute the gaussian kernel
+                    i == 1 && j == 3 || // Compressed descriptors
                     i == 2 && j == 0 || // Update projection matrix
                     i == 3 && j == 1) { // Calculate alphas
                     mode = "**";
