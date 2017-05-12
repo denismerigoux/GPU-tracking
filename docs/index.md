@@ -13,7 +13,7 @@ We modified the OpenCV implementation of the [KCF object tracking algorithm](htt
 An object tracking algorithm takes as input a video seens as a sequence of frames, and an initial bounding box that indicates the object to track. The algorithm offers an interface consisting of two methods:
 
 * `init(initial_frame,bounding_box)` which sets up the algorithm data structures;
-* `update(new_frame)` which updates the position of the bounding box by identifying the position of the tracked object on the `new_frame`.
+* `update(next_frame,bounding_box)` which updates the position of the bounding box by identifying the position of the tracked object on the `next_frame`.
 
 ### Key operations
 
@@ -168,7 +168,7 @@ The inputs consists in a set of videos of the same length showing Charlie Chapli
 
 ### Possible improvements
 
-While we have optimized the most time-consuming parts of the algorithm using CUDA, a better solution would be to implement the whole algorithm using only GPU data structures and kernels. We could then achieve a 2x or 3x speedup on all of the little tasks that take 2 or 3 ms each, effectively increasing the overall speedup.
+While we have optimized the most time-consuming parts of the algorithm using CUDA, implementing the whole algorithm using only GPU data structures and kernels may yield better result. We might achieve a 2x or 3x speedup on all the small tasks that take 2 or 3 ms each, effectively increasing the overall speedup.
 
 ## Conclusion
 
