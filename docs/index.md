@@ -125,7 +125,7 @@ This optimization decreased average time by another 5 ms.
 
 The main metric for our experiment is the wall-clock time used to update the bounding box for one new frame, averaged over all 189 frames of the video (except the first one, where many data structures are set up).
 
-The input consists in a video of 189 frames showing Charlie Chaplin walking across the screen, with a fullHD resolution (1920x1080).
+The input consists in a video of 189 frames showing Charlie Chaplin walking across the screen, with a 4K resolution (2160x3840).
 
 ### Parallel program time breakdown
 
@@ -164,7 +164,7 @@ The input consists in a video of 189 frames showing Charlie Chaplin walking acro
 
 ### Impact of resolution
 
-We tried running our program wth the same video at various resolutions (480p, 720p, 1080p, 2160p, 3190p) but the sequential algorithm takes approximately the same time to update the bounding box with a new frame. Indeed, the KCF algorithm only looks at the image data that's just
+We tried running our program with the same video at various resolutions (480p, 720p, 1080p, 2160p, 3190p) and it was confirmed that our algorithm is useful for scaling out the resolution: the bigger the matrices, the better is the benefit for using a GPU. On the contrary, scaling in yields poor performance on the GPU with data transfer times dominating the computations: sequential implementation runs faster.
 
 ### Possible improvements
 
