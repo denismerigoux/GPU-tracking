@@ -166,6 +166,10 @@ The input consists in a video of 189 frames showing Charlie Chaplin walking acro
 
 We tried running our program with the same video at various resolutions (480p, 720p, 1080p, 2160p, 3190p) and it was confirmed that our algorithm is useful for scaling out the resolution: the bigger the matrices, the better is the benefit for using a GPU. On the contrary, scaling in yields poor performance on the GPU with data transfer times dominating the computations: sequential implementation runs faster.
 
+![Speedup as a function of resolution](speedup_graph.png)
+
+We notice that the speedup reaches asymptotycally a 2x value whith high resolutions, corresponding to the natural speedup of using the GPU for these particular tasks (transfer times are negligible).
+
 ### Possible improvements
 
 While we have optimized the most time-consuming parts of the algorithm using CUDA, a better solution would be to implement the whole algorithm using only GPU data structures and kernels. We could then achieve a 2x or 2.5x speedup on all of the little tasks that take 2 or 3 ms each, effectively increasing the overall speedup.
