@@ -3,33 +3,25 @@ _A 15-618 Final Project by Ilaï Deutel and Denis Merigoux_
 
 ## Summary
 
-We are implementing an optimized object tracker on NVIDIA GPUs using the [KCF algorithm](http://home.isr.uc.pt/~pedromartins/Publications/henriques_eccv2012.pdf). The goal is to perform real-time object tracking with a simple OpenCV interface (using the [OpenCV Tracking API](http://docs.opencv.org/trunk/d9/df8/group__tracking.html)).
+We modified the OpenCV implementation of the [KCF object tracking algorithm](http://home.isr.uc.pt/~pedromartins/Publications/henriques_eccv2012.pdf) to use the NVIDIA GPUs of the GHC machines. Our 1.84$\times$ final speedup obtained on a fullHD video increased the number of FPS from 8.4 to 12.8.
 
-## The challenge
 
-The main dependency is temporal: you need to examine the frames in order, each one after the other. However, the algorithm present some points of synchronization that prevent total parallelization. The size of the working data is not that big (we only work one image at a time) but the complexity of the computations in the algorithm is relatively low, so the dominant factor between data access and computation is unclear.
+## Background
 
-The challenge is then to optimize the parallelization rate of the algorithm, find out the bottlenecks and try to overcome them The goal is to perform the computation in real time with the best framerate possible (with a decent resolution).
+### Tracking API
 
-## Correctness and performance analysis
+An object tracking algorithm takes as input a video seens as a sequence of frames, and an initial bounding box that indicates the object to track. The algorithm offers an interface consisting of two methods:
 
-We have built a correctness and performance analysis engine, which shows performance per task (averaged over the number of frames) updated in real time, and stop if the parallel solution is not correct. We determine if the solution is correct by comparing the bounding boxes returned by the parallel implementation with those returned by the sequential implementation. They must be *exactly* the same (no approximation).
+* `init(initial_frame,bounding_box)` which sets up the algorithm data structures;
+* `update(new_frame)` which updates the position of the bounding box by identifying the position of the tracked object on the `new_frame`.
 
-Example of output for an incorrect implementation:
-```
-=== Sequential ===
-// Performance information for the 189 frames of the video, not shown here
-=== Parallel ===
-// Performance information for the first 4 frames of the video, not shown here
-Correctness failed at frame 3
-Bounding box mismatch:
-* Sequential: [286 x 720 from (635, 219)]
-* Parallel: [286 x 720 from (635, 221)]
-```
+### Key operations
 
-## Analyzing performance of the sequential implementation
+The KCF algorithm (and the other tracking algorithm) use diverse statistical learning techniques to infer the new position of the tracked object. These techniques operate on matrices, which offer potential for parallelization. However, the KCF algortihm makes use of non-linear operations such as Fourier transform to compute kernels. Because the tracking algorithm sees only one frame at a time (as in a real-time use case), the parallelization axis concerns the number of pixels in a frame, which directly influences the dimensions of the matrices handled by the algorithm.
 
-The table below gives the time, averaged over the number of frames after the first frame (which serves as initialization), taken by the baseline sequential algorithm for each subtask:
+### Workload decomposition
+
+By examining the sequential implementation of the KCF tracker in OpenCV, we broke down the time spent in each phase of the algorithm. The longest and most computational-intensive phases are in bold; they involve mostly Discrete Fourier Transform and matrix multiplication.
 
 | Phase | Subtask | Time taken |
 |--------------------------|-------------------------------------|-----------------|
@@ -64,17 +56,82 @@ The table below gives the time, averaged over the number of frames after the fir
 |  | *Total* | *23.115 ms* |
 | ***Total time for a frame*** | | ***114.811 ms*** |
 
-## Preliminary results
+The values are averaged over all the 189 frames of the test video.
 
-Given the timing results on the sequential algorithm, we have decided to start improving the performance of [`denseGaussKernel`](https://github.com/denismerigoux/GPU-tracking/blob/master/src/trackerKCF.cpp), which is called in both the _Compute the gaussian kernel_ and _Calculate alphas_ phases.
+## Approach
 
-This function uses calls to [Fast Fourier Transform](https://en.wikipedia.org/wiki/Fast_Fourier_transform) and inverse FFT, therefore we have decided to use [the NVIDIA CUDA Fast Fourier Transform library (cuFFT)](https://developer.nvidia.com/cufft).
+### Framework and starting code
 
-We have also implemented a parallel version of `updateProjectionMatrix`, which involves a very large matrix multiplication.
+Because the algorithm is very complex, we chose to modify the existing [sequential KCF OpenCV implementation](http://docs.opencv.org/trunk/d2/dff/classcv_1_1TrackerKCF.html), rather than start from scratch. The choice of the OpenCV implementation has been made for several reasons:
 
-We have written custom kernels for function `extractCN`, which extracts color names for patches.
+* the OpenCV framework is heavily optimized and the sequenial implementation of the algorithm in the framework is then a good sequential baseline;
+* the framework offers high-level bindings for CUDA specifically tailored for matrices operations;
+* our project is more usable as part of an OpenCV modules than if it was written using custom conventions and APIs;
+* OpenCV is very popular for image processing and speeding up one of its modules could benefit other people.
 
-Our parallel implementation yield the following results:
+Because of this choice, our work use C++ and CUDA, and targets the GHC machines to make use of the high-end NVIDIA GTX 1080. The OpenCV CUDA bindings take care of mapping most of the higher-level operations to the hardware warps.
+
+### Testing and profiling framework
+
+Our first main task was to implement a custom profiling and correctness testing framework on top of the starting code to be able to constantly check if our parallel implementation yield exactly the same results as the baseline implementation. The profiling is done with cycle timer with average values over all frames and the correctness test checks for the coordinates of the updated bounding box after each iteration. They must be *exactly* the same (no approximation).
+
+Example of output for an incorrect implementation:
+```
+=== Sequential ===
+// Performance information for the 189 frames of the video, not shown here
+=== Parallel ===
+// Performance information for the first 4 frames of the video, not shown here
+Correctness failed at frame 3
+Bounding box mismatch:
+* Sequential: [286 x 720 from (635, 219)]
+* Parallel: [286 x 720 from (635, 221)]
+```
+
+
+We'll now discuss how we increased performance for each one of the three most computational-intensive phases of the algorithm.
+
+### Discrete Fourier transform
+
+The baseline implementation used a sequential implementation of the DFT. After having noticed that this was the most time-consuming operation of the algorithm, we decided to switch to [cuFFT](http://docs.nvidia.com/cuda/cufft/), which is a high performance DFT library maintained by NVIDIA that specifically targets their GPUs.
+
+OpenCV provided a binding to call `cufftexec` but we had to modify heavily this binding for two reasons:
+
+* the binding only offered support for `float` matrices and not `double` matrices;
+* the binding did not take into account the fact that the input and output format for the complex matrices for `cuFFT` is the CCE format, which is different from the full format used in the sequential implementation.
+
+While handling double precision matrices was fairly easy, the format translation was the main stumbling block of our project. Indeed, switching from one format to the other required a significant amount of computation that decreased performance, cancelling the benefit of using `cuFFT`. Instead, we preferred to modify the part of the algorithm that operated on complex spectrum matrices (after forward transform and before inverse transform) to accomodate for the native output and input format of `cuFFT`.
+
+Replacing sequential FFT with `cuFFT` with the above accomodation triggered a decrease of 20 ms of the average computing time for updating one frame, and a local 2x speedup. Indeed, the DFT was used for computing gaussian kernels in a function used in two critical phases of the algorithm.
+
+### Updating the projection matrix
+
+The second most time-consuming phase was performing a Principal Component Analysis. The associated function performs a Singular Values Decomposition wirth some pre-processing to update the covariance matrix. First we thought that we would have to speedup the SVD to increase performance, but a careful profiling revealed that the most time-consuming subpart was, by a large factor, the update of the covariance matrix.
+
+In this situation, using opencv `gemm` (Generalized Matrix Multiplication) function was sufficient to achieve a 2x local speedup. Indeed, the matrix product multiplied a matrix by its transpose, operation that is heavily optimized on GPU but not on CPU. Is is worth noting that we tried to use `gemm` in another context with a matrix of size `(n,m)` where `m >> n` multiplied bu another matrix of small size; but here the disparity of sizes and the data layout caused very poor performance on the GPU, and the CPU implementation was actually faster.
+
+Another problem that arose during the optimization of this subtask was the migration of data between the CPU and the GPU. Because the algorithm still uses the CPU for most of its operations, we need to maintain data structures on the CPU and on the GPU, with occasional transfers to update at the right time. However, the transfer of a matrix takes approximately 1 ms, which can be crucial in fast operations. We during the project tried to carefully balance the benefits of GPU speedup vs. the drawback of slow GPU<->CPU transfers. Another optimization was to have fixed-size GPU data structures to have O(1) `cudaMalloc` calls, to avoid loosing more precious milliseconds.
+
+All these optimizations combined triggered a gain of another 10 ms.
+
+### Compressed descriptors
+
+Finally, we optimized a more complicated operation involving extracting matrices descriptors. The operation consists in merging the values of the 3 channels of an image for each pixel and applying some arithmetic functions on their values to extract color names from image patches. Because of the specificity of this situation, we had to use OpenCV's binding to write our own CUDA kernel operating on OpenCV's `GpuMat`. We launched the kernels with blocks of 32x32 CUDAthreads, value chosen after the experimentations of the CUDA renderer in Assignment 2.
+
+This optimization decreased average time by another 5 ms.
+
+## Results
+
+### Metric and inputs
+
+The main metric for our experiment is the wall-clock time used to update the bounding box for one new frame, averaged over all 189 frames of the video (except the first one, where many data structures are set up).
+
+The inputs consists in a set of videos of the same length showing Charlie Chaplin walking across the screen, each video having a different resolution (from 480p to 4K).
+
+### Graph
+
+À toi de jouer Ilaï !
+
+### Parallel program time breakdown
 
 | Phase | Subtask | Time taken |
 |--------------------------|-------------------------------------|-----------------|
@@ -109,12 +166,13 @@ Our parallel implementation yield the following results:
 |  | *Total* | *14.633 ms* |
 | Total time for a frame | ****** | ***77.848 ms*** |
 
-Speedup: **x1.42**. We can track object at a rate of **12.4 frames per second** in FullHD using a NVIDIA GeForce GTX 1080, versus 8.7 frames per second with the sequential version.
+### Possible improvements
 
-## Ressources
+While we have optimized the most time-consuming parts of the algorithm using CUDA, a better solution would be to implement the whole algorithm using only GPU data structures and kernels. We could then achieve a 2x or 3x speedup on all of the little tasks that take 2 or 3 ms each, effectively increasing the overall speedup.
 
-We have used the [sequential KCF OpenCV implementation](http://docs.opencv.org/trunk/d2/dff/classcv_1_1TrackerKCF.html) as a starting point. We are using the GPUs of the GHC machines to run our program.
+## Conclusion
 
+We haven't reach our main goal of processing a fullHD video in real time with a decent framerate, but we have definitely improved significantly the performance of a popular tracking module of OpenCV, using a piece of hardware specifically adapted for image processing (GPU).
 
 ## Deliverables
 * [Project proposal](https://github.com/denismerigoux/GPU-tracking/raw/master/proposal/proposal.pdf)
