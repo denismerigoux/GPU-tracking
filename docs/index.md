@@ -17,7 +17,7 @@ An object tracking algorithm takes as input a video seens as a sequence of frame
 
 ### Key operations
 
-The KCF algorithm (and the other tracking algorithm) use diverse statistical learning techniques to infer the new position of the tracked object. These techniques operate on matrices, which offer potential for parallelization. However, the KCF algortihm makes use of non-linear operations such as Fourier transform to compute kernels. Because the tracking algorithm sees only one frame at a time (as in a real-time use case), the parallelization axis concerns the number of pixels in a frame, which directly influences the dimensions of the matrices handled by the algorithm.
+The KCF algorithm (and the other tracking algorithm) use diverse computer vision techniques to infer the new position of the tracked object. These techniques operate on matrices, which offer potential for parallelization. However, the KCF algortihm makes use of non-linear operations such as Fourier transform to compute kernels. Because the tracking algorithm sees only one frame at a time (as in a real-time use case), the parallelization axis concerns the number of pixels in a frame, which directly influences the dimensions of the matrices handled by the algorithm.
 
 ### Workload decomposition
 
