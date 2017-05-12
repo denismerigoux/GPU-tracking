@@ -3,7 +3,7 @@ _A 15-618 Final Project by Ilaï Deutel and Denis Merigoux_
 
 ## Summary
 
-We modified the OpenCV implementation of the [KCF object tracking algorithm](http://home.isr.uc.pt/~pedromartins/Publications/henriques_eccv2012.pdf) to use the NVIDIA GPUs of the GHC machines. Our 1.84$\times$ final speedup obtained on a fullHD video increased the number of FPS from 8.4 to 12.8.
+We modified the OpenCV implementation of the [KCF object tracking algorithm](http://home.isr.uc.pt/~pedromartins/Publications/henriques_eccv2012.pdf) to use the NVIDIA GPUs of the GHC machines. Our 1.84x final speedup obtained on a fullHD video increased the number of FPS from 8.4 to 12.8.
 
 
 ## Background
@@ -13,11 +13,11 @@ We modified the OpenCV implementation of the [KCF object tracking algorithm](htt
 An object tracking algorithm takes as input a video seens as a sequence of frames, and an initial bounding box that indicates the object to track. The algorithm offers an interface consisting of two methods:
 
 * `init(initial_frame,bounding_box)` which sets up the algorithm data structures;
-* `update(next_frame,bounding_box)` which updates the position of the bounding box by identifying the position of the tracked object on the `next_frame`.
+* `update(new_frame)` which updates the position of the bounding box by identifying the position of the tracked object on the `new_frame`.
 
 ### Key operations
 
-The KCF algorithm (and the other tracking algorithm) use diverse computer vision techniques to infer the new position of the tracked object. These techniques operate on matrices, which offer potential for parallelization. However, the KCF algortihm makes use of non-linear operations such as Fourier transform to compute kernels. Because the tracking algorithm sees only one frame at a time (as in a real-time use case), the parallelization axis concerns the number of pixels in a frame, which directly influences the dimensions of the matrices handled by the algorithm.
+The KCF algorithm (and the other tracking algorithm) use diverse statistical learning techniques to infer the new position of the tracked object. These techniques operate on matrices, which offer potential for parallelization. However, the KCF algortihm makes use of non-linear operations such as Fourier transform to compute kernels. Because the tracking algorithm sees only one frame at a time (as in a real-time use case), the parallelization axis concerns the number of pixels in a frame, which directly influences the dimensions of the matrices handled by the algorithm.
 
 ### Workload decomposition
 
@@ -25,36 +25,36 @@ By examining the sequential implementation of the KCF tracker in OpenCV, we brok
 
 | Phase | Subtask | Time taken |
 |--------------------------|-------------------------------------|-----------------|
-| Detection | Extract and pre-process the patch | 1.028 ms |
-|  | Non-compressed custom descriptors | 0.204 ms |
-|  | **Compressed descriptors** | **7.796 ms** |
-|  | Compressed custom descritors | 2.821 ms |
-|  | Compress features and KRSL | 9.986 ms |
-|  | Merge all features | 1.595 ms |
-|  | **Compute the gaussian kernel** | **21.149 ms** |
-|  | Compute the FFT | 1.874 ms |
-|  | Calculate filter response | 3.171 ms |
-|  | Extract maximum response | 0.248 ms |
-|  | *Total* | *49.873 ms* |
+| Detection | Extract and pre-process the patch | 3.102 ms |
+|  | Non-compressed custom descriptors | 0.836 ms |
+|  | **Compressed descriptors** | **30.993 ms** |
+|  | Compressed custom descritors | 13.752 ms |
+|  | Compress features and KRSL | 37.745 ms |
+|  | Merge all features | 7.548 ms |
+|  | **Compute the gaussian kernel** | **144.494 ms** |
+|  | Compute the FFT | 15.714 ms |
+|  | Calculate filter response | 22.792 ms |
+|  | Extract maximum response | 0.959 ms |
+|  | *Total* | *277.935 ms* |
 | Extracting patches | Update bounding box | 0.000 ms |
-|  | Non-compressed descriptors | 1.023 ms |
-|  | Non-compressed custom descriptors | 0.199 ms |
-|  | **Compressed descriptors** | **7.397 ms** |
-|  | Compressed custom descriptors | 3.009 ms |
-|  | Update training data | 3.153 ms |
-|  | *Total* | *14.666 ms* |
-| Feature compression | **Update projection matrix** | **20.677 ms** |
-|  | Compress | 4.404 ms |
-|  | Merge all features | 0.717 ms |
-|  | *Total* | *25.623 ms* |
-| Least Squares Regression | Initialization | 0.000 ms |
-|  | **Calculate alphas** | **19.000 ms** |
-|  | Compute FFT | 1.847 ms |
-|  | Add a small value | 0.380 ms |
-|  | New Alphaf | 1.135 ms |
-|  | Update RLS model | 0.923 ms |
-|  | *Total* | *23.115 ms* |
-| ***Total time for a frame*** | | ***114.811 ms*** |
+|  | Non-compressed descriptors | 3.198 ms |
+|  | Non-compressed custom descriptors | 0.831 ms |
+|  | **Compressed descriptors** | **30.909 ms** |
+|  | Compressed custom descriptors | 13.755 ms |
+|  | Update training data | 12.978 ms |
+|  | *Total* | *61.196 ms* |
+| Feature compression | **Update projection matrix** | **87.808 ms** |
+|  | Compress | 18.144 ms |
+|  | Merge all features | 3.684 ms |
+|  | *Total* | *108.924 ms* |
+| Least Squares Regression | Initialization | 0.001 ms |
+|  | **Calculate alphas** | **142.453 ms** |
+|  | Compute FFT | 15.592 ms |
+|  | Add a small value | 1.930 ms |
+|  | New Alphaf | 6.526 ms |
+|  | Update RLS model | 4.539 ms |
+|  | *Total* | *169.960 ms* |
+|  | ***Total time for a frame*** | ***625.019 ms*** |
 
 The values are averaged over all the 189 frames of the test video.
 
@@ -101,7 +101,7 @@ OpenCV provided a binding to call `cufftexec` but we had to modify heavily this 
 
 While handling double precision matrices was fairly easy, the format translation was the main stumbling block of our project. Indeed, switching from one format to the other required a significant amount of computation that decreased performance, cancelling the benefit of using `cuFFT`. Instead, we preferred to modify the part of the algorithm that operated on complex spectrum matrices (after forward transform and before inverse transform) to accomodate for the native output and input format of `cuFFT`.
 
-Replacing sequential FFT with `cuFFT` with the above accomodation triggered a decrease of 20 ms of the average computing time for updating one frame, and a local 2x speedup. Indeed, the DFT was used for computing gaussian kernels in a function used in two critical phases of the algorithm.
+Replacing sequential FFT with `cuFFT` with the above accommodation triggered a decrease of 20 ms of the average computing time for updating one frame, and a local 2x speedup. Indeed, the DFT was used for computing gaussian kernels in a function used in two critical phases of the algorithm.
 
 ### Updating the projection matrix
 
@@ -125,50 +125,50 @@ This optimization decreased average time by another 5 ms.
 
 The main metric for our experiment is the wall-clock time used to update the bounding box for one new frame, averaged over all 189 frames of the video (except the first one, where many data structures are set up).
 
-The inputs consists in a set of videos of the same length showing Charlie Chaplin walking across the screen, each video having a different resolution (from 480p to 4K).
-
-### Graph
-
-À toi de jouer Ilaï !
+The input consists in a video of 189 frames showing Charlie Chaplin walking across the screen, with a fullHD resolution (1920x1080).
 
 ### Parallel program time breakdown
 
 | Phase | Subtask | Time taken |
 |--------------------------|-------------------------------------|-----------------|
-| Detection | Extract and pre-process the patch | 1.092 ms |
-|  | Non-compressed custom descriptors | 0.193 ms |
-|  | **Compressed descriptors** | **3.112 ms** |
-|  | Compressed custom descritors | 2.809 ms |
-|  | Compress features and KRSL | 8.910 ms |
-|  | Merge all features | 1.559 ms |
-|  | **Compute the gaussian kernel** | **10.724 ms** |
-|  | Compute the FFT | 1.833 ms |
-|  | Calculate filter response | 3.155 ms |
-|  | Extract maximum response | 0.237 ms |
-|  | *Total* | *33.623 ms* |
+| Detection | Extract and pre-process the patch | 3.013 ms |
+|  | Non-compressed custom descriptors | 0.801 ms |
+|  | **Compressed descriptors** | **11.132 ms** |
+|  | Compressed custom descritors | 13.820 ms |
+|  | Compress features and KRSL | 37.531 ms |
+|  | Merge all features | 7.441 ms |
+|  | **Compute the gaussian kernel** | **33.139 ms** |
+|  | Compute the FFT | 15.559 ms |
+|  | Calculate filter response | 22.445 ms |
+|  | Extract maximum response | 0.948 ms |
+|  | *Total* | *145.830 ms* |
 | Extracting patches | Update bounding box | 0.000 ms |
-|  | Non-compressed descriptors | 1.005 ms |
-|  | Non-compressed custom descriptors | 0.193 ms |
-|  | **Compressed descriptors** | **3.106 ms** |
-|  | Compressed custom descriptors | 3.500 ms |
-|  | Update training data | 2.970 ms |
-|  | *Total* | *10.686 ms* |
-| Feature compression | **Update projection matrix** | **13.403 ms** |
-|  | Compress | 4.280 ms |
-|  | Merge all features | 0.712 ms |
-|  | *Total* | *17.382 ms* |
-| Least Squares Regression | Initialization | 0.000 ms |
-|  | **Calculate alphas** | **11.783 ms** |
-|  | Compute FFT | 1.841 ms |
-|  | Add a small value | 0.398 ms |
-|  | New Alphaf | 1.140 ms |
-|  | Update RLS model | 0.847 ms |
-|  | *Total* | *14.633 ms* |
-| Total time for a frame | ****** | ***77.848 ms*** |
+|  | Non-compressed descriptors | 3.119 ms |
+|  | Non-compressed custom descriptors | 0.767 ms |
+|  | **Compressed descriptors** | **11.159 ms** |
+|  | Compressed custom descriptors | 13.571 ms |
+|  | Update training data | 12.820 ms |
+|  | *Total* | *40.979 ms* |
+| Feature compression | **Update projection matrix** | **57.125 ms** |
+|  | Compress | 17.983 ms |
+|  | Merge all features | 3.619 ms |
+|  | *Total* | *73.760 ms* |
+| Least Squares Regression | Initialization | 0.001 ms |
+|  | **Calculate alphas** | **36.834 ms** |
+|  | Compute FFT | 15.654 ms |
+|  | Add a small value | 1.904 ms |
+|  | New Alphaf | 6.324 ms |
+|  | Update RLS model | 4.633 ms |
+|  | *Total* | *60.198 ms* |
+| ***Total time for a frame*** | | ***327.326 ms*** |
+
+### Impact of resolution
+
+We tried running our program wth the same video at various resolutions (480p, 720p, 1080p, 2160p, 3190p) but the sequential algorithm takes approximately the same time to update the bounding box with a new frame. Indeed, the KCF algorithm only looks at the image data that's just
 
 ### Possible improvements
 
-While we have optimized the most time-consuming parts of the algorithm using CUDA, implementing the whole algorithm using only GPU data structures and kernels may yield better result. We might achieve a 2x or 3x speedup on all the small tasks that take 2 or 3 ms each, effectively increasing the overall speedup.
+While we have optimized the most time-consuming parts of the algorithm using CUDA, a better solution would be to implement the whole algorithm using only GPU data structures and kernels. We could then achieve a 2x or 2.5x speedup on all of the little tasks that take 2 or 3 ms each, effectively increasing the overall speedup.
 
 ## Conclusion
 
