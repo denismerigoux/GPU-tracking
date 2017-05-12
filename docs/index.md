@@ -164,7 +164,7 @@ The input consists in a video of 189 frames showing Charlie Chaplin walking acro
 
 ### Impact of resolution
 
-We tried running our program with the same video at various resolutions (480p, 720p, 1080p, 2160p, 3190p) and it was confirmed that our algorithm is useful for scaling out the resolution: the bigger the matrices, the better is the benefit for using a GPU. On the contrary, scaling in yields poor performance on the GPU with data transfer times dominating the computations: sequential implementation runs faster.
+We tried running our program with the same video at various resolutions (480p, 720p, 1080p, 1440p, 2160p) and it was confirmed that our algorithm is useful for scaling out the resolution: the bigger the matrices, the better is the benefit for using a GPU. On the contrary, scaling in yields poor performance on the GPU with data transfer times dominating the computations: sequential implementation runs faster.
 
 ![Speedup as a function of resolution](speedup_graph.png)
 
